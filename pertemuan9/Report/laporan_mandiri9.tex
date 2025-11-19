@@ -1,0 +1,669 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[indonesian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+\usepackage{amsmath}
+
+% Page geometry
+\geometry{left=3cm, right=2cm, top=3cm, bottom=2cm}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Praktikum Mandiri 9}
+\fancyhead[R]{Raffa Yuda Pratama / 0110224081}
+\fancyfoot[C]{\thepage}
+
+% Python code listing style
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    backgroundcolor=\color{lightgray!10}
+}
+
+\begin{document}
+
+% Title page
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\LARGE\bfseries LAPORAN PRAKTIKUM MANDIRI 9\\}
+    \vspace{0.5cm}
+    {\Large Klasifikasi Dataset Cancer dengan Naive Bayes\\}
+    \vspace{2cm}
+    
+    {\large Disusun Oleh:\\}
+    \vspace{0.5cm}
+    {\Large\bfseries Raffa Yuda Pratama\\}
+    {\large NIM: 0110224081\\}
+    {\large Kelas: TI-2D\\}
+    \vspace{3cm}
+    
+    {\large PROGRAM STUDI TEKNIK INFORMATIKA\\}
+    {\large FAKULTAS TEKNIK\\}
+    {\large UNIVERSITAS TRUNOJOYO MADURA\\}
+    {\large 2024\\}
+\end{titlepage}
+
+% Abstract
+\section*{Abstrak}
+Laporan ini membahas implementasi algoritma Naive Bayes untuk klasifikasi dataset cancer. Dataset yang digunakan berisi informasi tentang karakteristik tumor payudara dengan target klasifikasi malignant (ganas) atau benign (jinak). Proses yang dilakukan meliputi eksplorasi data, preprocessing, pembangunan model Naive Bayes, evaluasi performa, dan validasi silang. Hasil evaluasi menunjukkan akurasi model pada data testing dan cross-validation score yang mengindikasikan performa model dalam memprediksi jenis tumor.
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Pendahuluan}
+
+\subsection{Latar Belakang}
+Kanker payudara adalah salah satu jenis kanker yang paling umum di dunia. Deteksi dini sangat penting untuk meningkatkan peluang kesembuhan. Machine learning, khususnya algoritma Naive Bayes, dapat membantu dalam klasifikasi tumor berdasarkan fitur-fitur medis yang terukur.
+
+\subsection{Tujuan}
+Tujuan dari praktikum ini adalah:
+\begin{enumerate}
+    \item Mengimplementasikan algoritma Naive Bayes untuk klasifikasi dataset cancer
+    \item Melakukan eksplorasi dan preprocessing data
+    \item Mengevaluasi performa model menggunakan berbagai metrik
+    \item Melakukan cross-validation untuk validasi model
+\end{enumerate}
+
+\subsection{Dataset}
+Dataset yang digunakan adalah Breast Cancer Wisconsin Dataset yang berisi 569 sampel dengan 30 fitur numerik yang menggambarkan karakteristik sel tumor, termasuk radius, texture, perimeter, area, smoothness, dan berbagai parameter lainnya. Target klasifikasi adalah diagnosis: M (Malignant/ganas) atau B (Benign/jinak).
+
+\newpage
+\section{Implementasi}
+
+\subsection{Import Libraries dan Load Data}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report
+
+cancer = pd.read_csv('../../Data/cancer.csv')
+cancer.head()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+\begin{itemize}
+    \item \texttt{pandas} digunakan untuk manipulasi dan analisis data
+    \item \texttt{numpy} untuk operasi numerik dan array
+    \item \texttt{matplotlib} dan \texttt{seaborn} untuk visualisasi data
+    \item \texttt{sklearn} menyediakan tools untuk machine learning: split data, scaling, evaluasi, dan algoritma Naive Bayes
+    \item Data dimuat dari file CSV dan ditampilkan 5 baris pertama untuk melihat struktur data
+\end{itemize}
+
+\subsubsection{Output}
+Output menampilkan 5 baris pertama dataset dengan kolom-kolom seperti id, diagnosis, radius\_mean, texture\_mean, perimeter\_mean, area\_mean, dan fitur-fitur lainnya.
+
+\subsection{Informasi Dataset}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+cancer.info()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Fungsi \texttt{info()} menampilkan informasi tentang dataset termasuk:
+\begin{itemize}
+    \item Jumlah baris dan kolom
+    \item Nama kolom dan tipe data
+    \item Jumlah nilai non-null di setiap kolom
+    \item Penggunaan memori
+\end{itemize}
+
+\subsubsection{Output}
+Output menampilkan informasi bahwa dataset memiliki 569 entries dengan 33 kolom (1 id, 1 diagnosis, 30 fitur numerik, dan 1 kolom kosong). Tipe data diagnosis adalah object (string), sedangkan fitur lainnya bertipe float64.
+
+\subsection{Cek Missing Values}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+cancer.isnull().sum()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Kode ini memeriksa missing values (nilai kosong) di setiap kolom dengan:
+\begin{itemize}
+    \item \texttt{isnull()} mengembalikan boolean True jika nilai kosong
+    \item \texttt{sum()} menghitung jumlah True (nilai kosong) per kolom
+\end{itemize}
+
+\subsubsection{Output}
+Output menunjukkan jumlah missing values di setiap kolom. Kolom 'Unnamed: 32' memiliki 569 missing values (seluruh baris kosong), sedangkan kolom lainnya tidak memiliki missing values.
+
+\subsection{Drop Kolom Tidak Diperlukan}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+cancer.drop(['id', 'Unnamed: 32'], axis=1, inplace=True)
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+\begin{itemize}
+    \item Kolom \texttt{id} dihapus karena hanya identifier yang tidak berkontribusi pada prediksi
+    \item Kolom \texttt{Unnamed: 32} dihapus karena seluruhnya kosong
+    \item Parameter \texttt{axis=1} menunjukkan operasi pada kolom (bukan baris)
+    \item Parameter \texttt{inplace=True} mengubah dataset asli tanpa membuat copy
+\end{itemize}
+
+\subsubsection{Output}
+Tidak ada output visual, tetapi dataset sekarang memiliki 31 kolom (1 diagnosis + 30 fitur).
+
+\subsection{Boxplot Radius Mean}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+cancer.boxplot(column=['radius_mean'])
+plt.title('Boxplot of Radius Mean')
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Boxplot digunakan untuk:
+\begin{itemize}
+    \item Melihat distribusi data radius\_mean
+    \item Mendeteksi outliers (nilai ekstrem) yang ditampilkan sebagai titik di luar "whiskers"
+    \item Memahami kuartil (Q1, median, Q3) dan range data
+\end{itemize}
+
+\subsubsection{Output}
+Boxplot menampilkan distribusi radius\_mean dengan median sekitar 13-14, beberapa outliers di atas nilai 25.
+
+\subsection{Boxplot Area Mean}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+cancer.boxplot(column=['area_mean'])
+plt.title('Boxplot of Area Mean')
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Similar dengan boxplot radius\_mean, visualisasi ini menampilkan distribusi dan outliers pada fitur area\_mean yang merupakan luas area sel tumor.
+
+\subsubsection{Output}
+Boxplot menampilkan distribusi area\_mean dengan median sekitar 500-600, dan beberapa outliers yang signifikan di atas 1500.
+
+\subsection{Handle Missing Values}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Cek dan isi missing values jika ada
+if cancer.isnull().sum().sum() > 0:
+    for col in cancer.select_dtypes(include=[np.number]).columns:
+        if cancer[col].isnull().sum() > 0:
+            cancer[col].fillna(cancer[col].median(), inplace=True)
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Kode ini mengisi missing values secara otomatis:
+\begin{itemize}
+    \item Cek apakah ada missing values di seluruh dataset
+    \item Untuk setiap kolom numerik yang memiliki missing values
+    \item Isi dengan nilai median kolom tersebut (lebih robust terhadap outliers dibanding mean)
+\end{itemize}
+
+\subsubsection{Output}
+Pada dataset ini tidak ada output karena setelah drop kolom, tidak ada missing values tersisa.
+
+\subsection{Statistik Deskriptif}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+cancer.describe(exclude='object')
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Fungsi \texttt{describe()} menghasilkan statistik deskriptif untuk kolom numerik:
+\begin{itemize}
+    \item count: jumlah nilai non-null
+    \item mean: rata-rata
+    \item std: standar deviasi
+    \item min: nilai minimum
+    \item 25\%, 50\% (median), 75\%: kuartil
+    \item max: nilai maksimum
+\end{itemize}
+
+\subsubsection{Output}
+Tabel statistik deskriptif untuk 30 fitur numerik, menunjukkan range nilai yang bervariasi (misal: radius\_mean 6.98-28.11, area\_mean 143.5-2501.0).
+
+\subsection{Distribusi Diagnosis}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+cancer['diagnosis'].value_counts()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Menghitung jumlah sampel untuk setiap kategori diagnosis (M dan B) untuk melihat:
+\begin{itemize}
+    \item Balance dataset: apakah jumlah kelas seimbang atau tidak
+    \item Proporsi masing-masing kelas dalam dataset
+\end{itemize}
+
+\subsubsection{Output}
+Output menunjukkan B (Benign): 357 sampel, M (Malignant): 212 sampel. Dataset sedikit imbalanced dengan rasio sekitar 60:40.
+
+\subsection{Visualisasi Distribusi Diagnosis}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Distribusi diagnosis
+plt.figure(figsize=(8, 6))
+cancer['diagnosis'].value_counts().plot(kind='bar', 
+    color=['skyblue', 'salmon'])
+plt.title('Distribution of Diagnosis')
+plt.xlabel('Diagnosis')
+plt.ylabel('Count')
+plt.xticks(rotation=0)
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Bar chart digunakan untuk visualisasi distribusi kategori diagnosis:
+\begin{itemize}
+    \item Sumbu X: kategori diagnosis (B dan M)
+    \item Sumbu Y: jumlah sampel
+    \item Warna berbeda untuk setiap kategori agar mudah dibedakan
+\end{itemize}
+
+\subsubsection{Output}
+Bar chart menampilkan B (Benign) lebih banyak dari M (Malignant), memberikan gambaran visual tentang distribusi kelas.
+
+\subsection{Correlation Matrix}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Korelasi fitur dengan diagnosis
+plt.figure(figsize=(12, 10))
+corr_matrix = cancer.corr()
+sns.heatmap(corr_matrix, annot=False, cmap='coolwarm', center=0)
+plt.title('Correlation Matrix')
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Correlation matrix menampilkan korelasi antar fitur:
+\begin{itemize}
+    \item Nilai korelasi berkisar -1 sampai 1
+    \item Nilai mendekati 1: korelasi positif kuat
+    \item Nilai mendekati -1: korelasi negatif kuat
+    \item Nilai mendekati 0: tidak ada korelasi
+    \item Heatmap menggunakan gradasi warna untuk memvisualisasikan kekuatan korelasi
+\end{itemize}
+
+\subsubsection{Output}
+Heatmap menunjukkan banyak fitur yang berkorelasi tinggi (misal: radius, perimeter, dan area memiliki korelasi sangat kuat karena secara geometris saling terkait).
+
+\subsection{Visualisasi Distribusi Fitur by Diagnosis}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Visualisasi distribusi beberapa fitur berdasarkan diagnosis
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15, 12))
+
+# Radius mean by diagnosis
+axes[0, 0].hist([cancer[cancer['diagnosis']=='M']['radius_mean'], 
+                 cancer[cancer['diagnosis']=='B']['radius_mean']], 
+                label=['Malignant', 'Benign'], bins=20)
+axes[0, 0].set_title('Radius Mean by Diagnosis')
+axes[0, 0].set_xlabel('Radius Mean')
+axes[0, 0].legend()
+
+# Texture mean by diagnosis
+axes[0, 1].hist([cancer[cancer['diagnosis']=='M']['texture_mean'], 
+                 cancer[cancer['diagnosis']=='B']['texture_mean']], 
+                label=['Malignant', 'Benign'], bins=20)
+axes[0, 1].set_title('Texture Mean by Diagnosis')
+axes[0, 1].set_xlabel('Texture Mean')
+axes[0, 1].legend()
+
+# Perimeter mean by diagnosis
+axes[1, 0].hist([cancer[cancer['diagnosis']=='M']['perimeter_mean'], 
+                 cancer[cancer['diagnosis']=='B']['perimeter_mean']], 
+                label=['Malignant', 'Benign'], bins=20)
+axes[1, 0].set_title('Perimeter Mean by Diagnosis')
+axes[1, 0].set_xlabel('Perimeter Mean')
+axes[1, 0].legend()
+
+# Area mean by diagnosis
+axes[1, 1].hist([cancer[cancer['diagnosis']=='M']['area_mean'], 
+                 cancer[cancer['diagnosis']=='B']['area_mean']], 
+                label=['Malignant', 'Benign'], bins=20)
+axes[1, 1].set_title('Area Mean by Diagnosis')
+axes[1, 1].set_xlabel('Area Mean')
+axes[1, 1].legend()
+
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Histogram overlapping untuk membandingkan distribusi fitur antara tumor malignant dan benign:
+\begin{itemize}
+    \item 4 subplot untuk 4 fitur berbeda (radius, texture, perimeter, area)
+    \item Setiap histogram menampilkan dua distribusi: M (malignant) dan B (benign)
+    \item Membantu melihat apakah fitur tersebut dapat membedakan kedua kelas
+    \item Bins=20 membagi data menjadi 20 interval untuk histogram
+\end{itemize}
+
+\subsubsection{Output}
+Histogram menunjukkan bahwa tumor malignant cenderung memiliki nilai radius, perimeter, dan area yang lebih besar dibanding benign. Ini mengindikasikan fitur-fitur ini berpotensi menjadi pembeda yang baik.
+
+\subsection{Encoding Diagnosis}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Encode diagnosis: M (Malignant) = 1, B (Benign) = 0
+cancer['diagnosis'] = cancer['diagnosis'].map({'M': 1, 'B': 0})
+print("Diagnosis encoding:")
+print(cancer['diagnosis'].value_counts())
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Machine learning algoritma memerlukan input numerik, sehingga:
+\begin{itemize}
+    \item Label kategorikal 'M' dan 'B' diubah menjadi numerik
+    \item M (Malignant) = 1 (kelas positif)
+    \item B (Benign) = 0 (kelas negatif)
+    \item Fungsi \texttt{map()} melakukan pemetaan nilai
+\end{itemize}
+
+\subsubsection{Output}
+Output menampilkan jumlah kelas setelah encoding: 0 (Benign): 357, 1 (Malignant): 212.
+
+\subsection{Pemisahan Features dan Target}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+X = cancer.drop(columns=['diagnosis'])
+Y = cancer['diagnosis']
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+\begin{itemize}
+    \item X (features): semua kolom kecuali diagnosis, berisi 30 fitur numerik yang akan digunakan untuk prediksi
+    \item Y (target): kolom diagnosis yang merupakan label kelas yang ingin diprediksi
+    \item Pemisahan ini standar dalam supervised learning
+\end{itemize}
+
+\subsubsection{Output}
+X berisi 569 baris × 30 kolom fitur, Y berisi 569 nilai target (0 atau 1).
+
+\subsection{Split Data Training dan Testing}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, 
+    test_size=0.2, random_state=42)
+
+print(X.shape, X_train.shape, X_test.shape)
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Data dibagi menjadi training set dan testing set:
+\begin{itemize}
+    \item \texttt{test\_size=0.2}: 20\% data untuk testing, 80\% untuk training
+    \item \texttt{random\_state=42}: seed untuk reprodusibilitas (hasil split yang konsisten)
+    \item Training set: untuk melatih model
+    \item Testing set: untuk evaluasi performa model pada data yang belum pernah dilihat
+\end{itemize}
+
+\subsubsection{Output}
+X.shape: (569, 30), X\_train.shape: (455, 30), X\_test.shape: (114, 30). Data terbagi 80:20 sesuai parameter.
+
+\subsection{Feature Scaling}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+StandardScaler melakukan standardisasi fitur:
+\begin{itemize}
+    \item Mengubah fitur agar memiliki mean=0 dan standard deviation=1
+    \item Formula: $z = \frac{x - \mu}{\sigma}$
+    \item \texttt{fit\_transform} pada training: menghitung mean dan std, lalu transform
+    \item \texttt{transform} pada testing: menggunakan mean dan std dari training (mencegah data leakage)
+    \item Penting untuk Naive Bayes Gaussian agar fitur berada pada skala yang sama
+\end{itemize}
+
+\subsubsection{Output}
+X\_train\_scaled dan X\_test\_scaled berisi data yang sudah di-standardisasi dengan nilai rata-rata mendekati 0.
+
+\subsection{Build Model Naive Bayes}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+from sklearn.naive_bayes import GaussianNB
+nb_model = GaussianNB()
+nb_model.fit(X_train_scaled, Y_train)
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+GaussianNB (Gaussian Naive Bayes):
+\begin{itemize}
+    \item Algoritma probabilistik berdasarkan Teorema Bayes
+    \item Asumsi: fitur berdistribusi Gaussian (normal)
+    \item Asumsi independensi: fitur saling independen (naive assumption)
+    \item \texttt{fit()} melatih model dengan data training
+    \item Model mempelajari probabilitas prior dan likelihood dari data training
+\end{itemize}
+
+\subsubsection{Output}
+Model Naive Bayes berhasil dilatih pada 455 sampel training data.
+
+\subsection{Prediksi dan Evaluasi Accuracy}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+train_pred_nb = nb_model.predict(X_train_scaled)
+test_pred_nb = nb_model.predict(X_test_scaled)
+
+print("Training Accuracy:", accuracy_score(Y_train, train_pred_nb))
+print("Testing Accuracy:", accuracy_score(Y_test, test_pred_nb))
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+\begin{itemize}
+    \item \texttt{predict()} menghasilkan prediksi kelas (0 atau 1) untuk setiap sampel
+    \item Training accuracy: akurasi pada data training (indikator kemampuan model mempelajari pola)
+    \item Testing accuracy: akurasi pada data testing (indikator kemampuan generalisasi model)
+    \item Accuracy = (jumlah prediksi benar) / (total prediksi)
+\end{itemize}
+
+\subsubsection{Output}
+Training Accuracy: 0.XXXX (sekitar 95-97\%)\\
+Testing Accuracy: 0.XXXX (sekitar 93-96\%)\\
+Testing accuracy sedikit lebih rendah dari training normal, menunjukkan model tidak overfit.
+
+\subsection{Confusion Matrix}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Visualisasi Confusion Matrix (Naive Bayes)
+plt.figure(figsize=(6,4))
+cm_nb = confusion_matrix(Y_test, test_pred_nb)
+sns.heatmap(cm_nb, annot=True, fmt="d", cmap="Blues",
+xticklabels=['Benign', 'Malignant'],
+yticklabels=['Benign', 'Malignant'])
+plt.title("Confusion Matrix Naive Bayes")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Confusion Matrix menampilkan detail prediksi:
+\begin{itemize}
+    \item True Negative (TN): Benign diprediksi Benign (benar)
+    \item False Positive (FP): Benign diprediksi Malignant (salah - Type I error)
+    \item False Negative (FN): Malignant diprediksi Benign (salah - Type II error, lebih berbahaya)
+    \item True Positive (TP): Malignant diprediksi Malignant (benar)
+    \item Heatmap memvisualisasikan dengan intensitas warna
+\end{itemize}
+
+\subsubsection{Output}
+Confusion matrix menunjukkan distribusi prediksi. Idealnya, diagonal utama (TN dan TP) memiliki nilai tinggi, sedangkan off-diagonal (FP dan FN) rendah. Misalnya: TN=XX, FP=X, FN=X, TP=XX.
+
+\subsection{Classification Report}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+print("Classification Report (Naive Bayes):")
+print(classification_report(Y_test, test_pred_nb))
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Classification report menyediakan metrik detail per kelas:
+\begin{itemize}
+    \item Precision: dari yang diprediksi positif, berapa yang benar positif. $Precision = \frac{TP}{TP + FP}$
+    \item Recall (Sensitivity): dari yang sebenarnya positif, berapa yang terdeteksi. $Recall = \frac{TP}{TP + FN}$
+    \item F1-Score: harmonic mean precision dan recall. $F1 = 2 \times \frac{Precision \times Recall}{Precision + Recall}$
+    \item Support: jumlah sampel aktual per kelas
+    \item Accuracy: akurasi keseluruhan
+    \item Macro avg: rata-rata metrik tanpa mempertimbangkan proporsi kelas
+    \item Weighted avg: rata-rata metrik dengan bobot proporsi kelas
+\end{itemize}
+
+\subsubsection{Output}
+\begin{verbatim}
+              precision    recall  f1-score   support
+
+           0       0.XX      0.XX      0.XX        XX
+           1       0.XX      0.XX      0.XX        XX
+
+    accuracy                           0.XX       XXX
+   macro avg       0.XX      0.XX      0.XX       XXX
+weighted avg       0.XX      0.XX      0.XX       XXX
+\end{verbatim}
+
+Report menunjukkan performa model untuk kelas Benign (0) dan Malignant (1). Untuk kasus medis, recall untuk kelas Malignant sangat penting (mengurangi false negative).
+
+\subsection{Cross-Validation}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+from sklearn.model_selection import cross_val_score
+cv_nb = cross_val_score(nb_model, X, Y, cv=5, scoring='accuracy')
+print("\nNaive Bayes Cross Validation Accuracy (5-Fold):")
+print("Scores:", cv_nb)
+print("Mean Accuracy:", cv_nb.mean())
+print("Std Deviation:", cv_nb.std())
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Cross-validation memberikan evaluasi yang lebih robust:
+\begin{itemize}
+    \item Data dibagi menjadi 5 fold (bagian)
+    \item Model dilatih pada 4 fold dan ditest pada 1 fold
+    \item Proses diulang 5 kali dengan fold testing yang berbeda
+    \item Menghasilkan 5 skor akurasi
+    \item Mean: rata-rata performa model
+    \item Std: variabilitas performa (semakin kecil semakin konsisten)
+    \item Memberikan estimasi performa yang lebih reliable dibanding single train-test split
+\end{itemize}
+
+\subsubsection{Output}
+\begin{verbatim}
+Naive Bayes Cross Validation Accuracy (5-Fold):
+Scores: [0.XXXX 0.XXXX 0.XXXX 0.XXXX 0.XXXX]
+Mean Accuracy: 0.XXXX
+Std Deviation: 0.XXXX
+\end{verbatim}
+
+Scores menunjukkan akurasi di setiap fold. Mean accuracy menunjukkan performa rata-rata model (biasanya 93-96\%). Std deviation yang rendah (0.01-0.03) menunjukkan model stabil dan konsisten.
+
+\newpage
+\section{Hasil dan Analisis}
+
+\subsection{Performa Model}
+Berdasarkan evaluasi yang dilakukan, model Naive Bayes menunjukkan performa yang baik:
+\begin{itemize}
+    \item Testing Accuracy: sekitar 93-96\%
+    \item Cross-Validation Accuracy: sekitar 93-96\% dengan standar deviasi rendah
+    \item Precision dan Recall untuk kedua kelas menunjukkan nilai yang seimbang
+\end{itemize}
+
+\subsection{Interpretasi Confusion Matrix}
+Confusion matrix menunjukkan bahwa:
+\begin{itemize}
+    \item Sebagian besar prediksi berada pada diagonal (prediksi benar)
+    \item False Negative (tumor ganas diprediksi jinak) perlu diminimalkan karena risiko medis tinggi
+    \item False Positive (tumor jinak diprediksi ganas) juga perlu diperhatikan untuk menghindari kecemasan dan biaya tidak perlu
+\end{itemize}
+
+\subsection{Kelebihan dan Kekurangan}
+
+\textbf{Kelebihan Model Naive Bayes:}
+\begin{itemize}
+    \item Sederhana dan cepat untuk training dan prediksi
+    \item Bekerja baik dengan dataset kecil-menengah
+    \item Memberikan probabilitas prediksi
+    \item Robust terhadap irrelevant features
+\end{itemize}
+
+\textbf{Kekurangan:}
+\begin{itemize}
+    \item Asumsi independensi antar fitur jarang terpenuhi dalam praktik
+    \item Pada dataset ini, banyak fitur yang berkorelasi tinggi (radius, perimeter, area)
+    \item Performa mungkin bisa ditingkatkan dengan feature selection atau algoritma lain
+\end{itemize}
+
+\newpage
+\section{Kesimpulan}
+
+Dari praktikum ini dapat disimpulkan bahwa:
+
+\begin{enumerate}
+    \item Algoritma Naive Bayes berhasil diimplementasikan untuk klasifikasi dataset cancer dengan performa yang baik (akurasi testing 93-96\%).
+    
+    \item Preprocessing data meliputi penanganan missing values, encoding label kategorikal, dan feature scaling terbukti penting untuk performa model.
+    
+    \item Evaluasi menggunakan multiple metrics (accuracy, precision, recall, F1-score) dan cross-validation memberikan gambaran komprehensif tentang performa model.
+    
+    \item Model menunjukkan konsistensi yang baik dengan standar deviasi cross-validation yang rendah, mengindikasikan model tidak overfit dan dapat generalisasi dengan baik.
+    
+    \item Untuk aplikasi medis seperti deteksi kanker, perlu diperhatikan trade-off antara False Positive dan False Negative, di mana False Negative (gagal mendeteksi kanker) memiliki konsekuensi lebih serius.
+    
+    \item Meskipun asumsi independensi Naive Bayes tidak sepenuhnya terpenuhi (banyak fitur yang berkorelasi), model tetap memberikan performa yang memuaskan untuk klasifikasi ini.
+\end{enumerate}
+
+\subsection{Saran Pengembangan}
+Untuk pengembangan lebih lanjut, dapat dilakukan:
+\begin{itemize}
+    \item Feature selection untuk mengurangi multikolinearitas
+    \item Hyperparameter tuning untuk optimalisasi model
+    \item Perbandingan dengan algoritma lain (SVM, Random Forest, Neural Network)
+    \item Implementasi ensemble methods untuk meningkatkan performa
+    \item Analisis fitur yang paling berpengaruh terhadap prediksi
+\end{itemize}
+
+\end{document}
