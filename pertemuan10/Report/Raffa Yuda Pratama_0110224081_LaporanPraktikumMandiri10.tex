@@ -1,0 +1,568 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[indonesian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\geometry{a4paper, left=3cm, right=3cm, top=3cm, bottom=3cm}
+
+% Setup untuk kode Python
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{gray!10},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=2,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)},
+    xleftmargin=2em,
+    framexleftmargin=1.5em
+}
+
+% Header dan Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Laporan Praktikum Mandiri 10}
+\fancyhead[R]{Machine Learning}
+\fancyfoot[C]{\thepage}
+
+\begin{document}
+
+\noindent
+\textbf{Tugas Mandiri 10} \hfill \textbf{Raffa Yuda Pratama / 0110224081}
+
+\vspace{1em}
+
+\begin{center}
+\textbf{\large Klasifikasi Data dengan K-Nearest Neighbors (KNN)} \\
+\textbf{\large Raffa Yuda Pratama - 0110224081$^{1*}$}
+\end{center}
+
+\noindent
+$^1$Teknik Informatika, STT Terpadu Nurul Fikri, Depok \\
+$^1$E-mail: mailto:0110224081@student.nurulfikri.ac.id
+
+\vspace{1em}
+
+\noindent
+\textbf{Abstract}. Laporan ini membahas penerapan metode \textit{K-Nearest Neighbors} (KNN) untuk menganalisis dan memprediksi klasifikasi data. Dataset yang digunakan merupakan kumpulan data yang berisi berbagai variabel seperti temperatur, kecepatan angin, dan parameter cuaca lainnya. Proses analisis meliputi pemisahan data, persiapan (preprocessing), pemisahan fitur dan target, pembagian data latih dan uji, pembangunan model KNN, serta evaluasi menggunakan metrik seperti akurasi, confusion matrix, precision, dan recall. Hasil pengujian menunjukkan bahwa model KNN mampu menjelaskan hubungan antara variabel-variabel dengan baik, sehingga dapat digunakan untuk analisis prediktif berbasis data klasifikasi.
+
+\vspace{1em}
+
+\section{Pendahuluan}
+
+\subsection{Latar Belakang}
+Praktikum ini bertujuan untuk memahami dan mengimplementasikan algoritma K-Nearest Neighbors (KNN) untuk klasifikasi data. KNN merupakan salah satu algoritma machine learning yang sederhana namun powerful untuk menyelesaikan masalah klasifikasi. Praktikum ini juga mencakup evaluasi model menggunakan confusion matrix dan berbagai metrik evaluasi seperti accuracy, precision, dan recall.
+
+\subsection{Tujuan}
+\begin{enumerate}
+    \item Memahami konsep dan implementasi algoritma K-Nearest Neighbors (KNN)
+    \item Mampu menentukan nilai k optimal untuk model KNN
+    \item Memahami dan mengimplementasikan confusion matrix
+    \item Mampu menghitung dan menginterpretasi metrik evaluasi (accuracy, precision, recall)
+    \item Mampu melakukan preprocessing data untuk model machine learning
+    \item Mampu membangun dan mengevaluasi model prediksi cuaca menggunakan KNN
+\end{enumerate}
+
+\section{Landasan Teori}
+
+\subsection{K-Nearest Neighbors (KNN)}
+K-Nearest Neighbors (KNN) adalah algoritma supervised learning yang dapat digunakan untuk klasifikasi maupun regresi. Algoritma ini bekerja dengan cara mencari k data terdekat dari data yang akan diprediksi, kemudian melakukan voting berdasarkan label dari k tetangga terdekat tersebut.
+
+\textbf{Rumus jarak Euclidean:}
+\begin{equation}
+d(p,q) = \sqrt{\sum_{i=1}^{n}(q_i - p_i)^2}
+\end{equation}
+
+\subsection{Confusion Matrix}
+Confusion Matrix adalah tabel yang digunakan untuk menggambarkan performa model klasifikasi. Tabel ini membandingkan nilai aktual dengan nilai prediksi.
+
+\begin{table}[H]
+\centering
+\caption{Format Confusion Matrix}
+\begin{tabular}{|c|c|c|}
+\hline
+ & \textbf{Predicted Positive} & \textbf{Predicted Negative} \\
+\hline
+\textbf{Actual Positive} & True Positive (TP) & False Negative (FN) \\
+\hline
+\textbf{Actual Negative} & False Positive (FP) & True Negative (TN) \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Metrik Evaluasi}
+
+\textbf{Accuracy:}
+\begin{equation}
+Accuracy = \frac{TP + TN}{TP + TN + FP + FN}
+\end{equation}
+
+\textbf{Precision:}
+\begin{equation}
+Precision = \frac{TP}{TP + FP}
+\end{equation}
+
+\textbf{Recall:}
+\begin{equation}
+Recall = \frac{TP}{TP + FN}
+\end{equation}
+
+\section{Latihan 1: Klasifikasi Suhu dengan KNN}
+
+\subsection{Deskripsi Soal}
+Pada latihan ini, kita akan mengklasifikasikan suhu udara berdasarkan persepsi Marry: Panas atau Dingin. Variabel yang digunakan adalah Temperatur (°C) dan Kecepatan Angin (km/h). Tugas kita adalah:
+\begin{itemize}
+    \item Menentukan persepsi Marry saat temperatur 16°C dan kecepatan angin 3 km/h
+    \item Menentukan nilai k yang tepat berdasarkan akurasi yang paling baik
+\end{itemize}
+
+\subsection{Dataset}
+Dataset terdiri dari 8 observasi dengan fitur Temperatur dan Kecepatan Angin:
+
+\begin{table}[H]
+\centering
+\caption{Dataset Klasifikasi Suhu}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{Temperatur (°C)} & \textbf{Kecepatan Angin (km/h)} & \textbf{Klasifikasi} \\
+\hline
+10 & 0 & Dingin \\
+25 & 0 & Panas \\
+15 & 5 & Dingin \\
+20 & 3 & Panas \\
+18 & 7 & Dingin \\
+20 & 10 & Dingin \\
+22 & 5 & Panas \\
+24 & 6 & Panas \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Implementasi}
+
+\subsubsection{Import Library}
+\begin{lstlisting}[language=Python, caption=Import Library yang Diperlukan]
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+\end{lstlisting}
+
+\subsubsection{Persiapan Data}
+\begin{lstlisting}[language=Python, caption=Persiapan Data]
+# Dataset suhu udara
+data_latihan1 = {
+    'Temperatur': [10, 25, 15, 20, 18, 20, 22, 24],
+    'Kecepatan_Angin': [0, 0, 5, 3, 7, 10, 5, 6],
+    'Klasifikasi': ['Dingin', 'Panas', 'Dingin', 'Panas', 
+                    'Dingin', 'Dingin', 'Panas', 'Panas']
+}
+
+df_latihan1 = pd.DataFrame(data_latihan1)
+\end{lstlisting}
+
+\subsubsection{Pencarian k Optimal}
+\begin{lstlisting}[language=Python, caption=Pencarian Nilai k Optimal dengan Cross-Validation]
+X_latihan1 = df_latihan1[['Temperatur', 'Kecepatan_Angin']].values
+y_latihan1 = df_latihan1['Klasifikasi'].values
+
+# Mencari k optimal dengan cross-validation
+k_range = range(1, 8)
+cv_scores = []
+
+for k in k_range:
+    knn = KNeighborsClassifier(n_neighbors=k)
+    scores = cross_val_score(knn, X_latihan1, y_latihan1, 
+                             cv=4, scoring='accuracy')
+    cv_scores.append(scores.mean())
+
+best_k = list(k_range)[np.argmax(cv_scores)]
+best_score = max(cv_scores)
+\end{lstlisting}
+
+\subsection{Hasil}
+
+\subsubsection{Nilai k Optimal}
+Berdasarkan hasil cross-validation, nilai k optimal yang diperoleh dapat dilihat pada tabel berikut:
+
+\begin{table}[H]
+\centering
+\caption{Hasil Cross-Validation untuk Berbagai Nilai k}
+\begin{tabular}{|c|c|}
+\hline
+\textbf{Nilai k} & \textbf{CV Accuracy} \\
+\hline
+1 & [hasil dari eksekusi] \\
+2 & [hasil dari eksekusi] \\
+3 & [hasil dari eksekusi] \\
+4 & [hasil dari eksekusi] \\
+5 & [hasil dari eksekusi] \\
+6 & [hasil dari eksekusi] \\
+7 & [hasil dari eksekusi] \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Prediksi untuk Test Point}
+\begin{lstlisting}[language=Python, caption=Prediksi dengan k Terbaik]
+test_point = np.array([[16, 3]])
+knn_best = KNeighborsClassifier(n_neighbors=best_k)
+knn_best.fit(X_latihan1, y_latihan1)
+
+prediction = knn_best.predict(test_point)
+probabilities = knn_best.predict_proba(test_point)
+\end{lstlisting}
+
+\textbf{Hasil Prediksi:}
+\begin{itemize}
+    \item Temperatur: 16°C
+    \item Kecepatan Angin: 3 km/h
+    \item Persepsi Marry: [hasil dari eksekusi]
+    \item Probabilitas Dingin: [hasil dari eksekusi]
+    \item Probabilitas Panas: [hasil dari eksekusi]
+\end{itemize}
+
+\subsection{Analisis dan Pembahasan}
+Berdasarkan hasil cross-validation, nilai k optimal adalah [hasil]. Dengan menggunakan nilai k tersebut, model memprediksi bahwa persepsi Marry terhadap kondisi dengan temperatur 16°C dan kecepatan angin 3 km/h adalah [hasil]. Prediksi ini didasarkan pada [best\_k] tetangga terdekat yang memiliki karakteristik serupa.
+
+\section{Latihan 2: Confusion Matrix dan Metrik Evaluasi}
+
+\subsection{Deskripsi Soal}
+Pada latihan ini, kita akan membuat confusion matrix dan menghitung metrik evaluasi berdasarkan data hasil prediksi kelulusan mahasiswa.
+
+\subsection{Dataset}
+Dataset terdiri dari 10 mahasiswa dengan hasil sebenarnya dan hasil prediksi:
+
+\begin{table}[H]
+\centering
+\caption{Data Hasil Prediksi Kelulusan}
+\begin{tabular}{|c|c|c|}
+\hline
+\textbf{NIM} & \textbf{Hasil Sebenarnya} & \textbf{Hasil Prediksi} \\
+\hline
+T1001 & Lulus & Lulus \\
+T1002 & Lulus & Lulus \\
+T1003 & Lulus & Lulus \\
+T1004 & Lulus & Tidak Lulus \\
+T1005 & Lulus & Tidak Lulus \\
+T1006 & Tidak Lulus & Lulus \\
+T1007 & Tidak Lulus & Tidak Lulus \\
+T1008 & Tidak Lulus & Tidak Lulus \\
+T1009 & Tidak Lulus & Tidak Lulus \\
+T1010 & Tidak Lulus & Tidak Lulus \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Implementasi}
+
+\begin{lstlisting}[language=Python, caption=Membuat Confusion Matrix]
+from sklearn.metrics import confusion_matrix
+
+# Encode label
+y_true = df_latihan2['Hasil_Sebenarnya'].map({'Lulus': 1, 'Tidak Lulus': 0})
+y_pred = df_latihan2['Hasil_Prediksi'].map({'Lulus': 1, 'Tidak Lulus': 0})
+
+# Confusion matrix
+cm = confusion_matrix(y_true, y_pred)
+\end{lstlisting}
+
+\subsection{Hasil}
+
+\subsubsection{Confusion Matrix}
+
+\begin{table}[H]
+\centering
+\caption{Confusion Matrix - Prediksi Kelulusan}
+\begin{tabular}{|c|c|c|}
+\hline
+ & \textbf{Predicted: Lulus} & \textbf{Predicted: Tidak Lulus} \\
+\hline
+\textbf{Actual: Lulus} & 3 & 2 \\
+\hline
+\textbf{Actual: Tidak Lulus} & 1 & 4 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Komponen Confusion Matrix:}
+\begin{itemize}
+    \item True Positive (TP) = 3 (Lulus diprediksi Lulus)
+    \item True Negative (TN) = 4 (Tidak Lulus diprediksi Tidak Lulus)
+    \item False Positive (FP) = 1 (Tidak Lulus diprediksi Lulus)
+    \item False Negative (FN) = 2 (Lulus diprediksi Tidak Lulus)
+\end{itemize}
+
+\subsubsection{Perhitungan Metrik Evaluasi}
+
+\begin{lstlisting}[language=Python, caption=Menghitung Metrik Evaluasi]
+# Menghitung metrik
+TP = cm[1][1]
+TN = cm[0][0]
+FP = cm[0][1]
+FN = cm[1][0]
+
+accuracy = (TP + TN) / (TP + TN + FP + FN)
+precision = TP / (TP + FP)
+recall = TP / (TP + FN)
+\end{lstlisting}
+
+\textbf{Accuracy:}
+\begin{align*}
+Accuracy &= \frac{TP + TN}{TP + TN + FP + FN} \\
+&= \frac{3 + 4}{3 + 4 + 1 + 2} \\
+&= \frac{7}{10} \\
+&= 0.7000 = 70.00\%
+\end{align*}
+
+\textbf{Precision:}
+\begin{align*}
+Precision &= \frac{TP}{TP + FP} \\
+&= \frac{3}{3 + 1} \\
+&= \frac{3}{4} \\
+&= 0.7500 = 75.00\%
+\end{align*}
+
+\textbf{Recall:}
+\begin{align*}
+Recall &= \frac{TP}{TP + FN} \\
+&= \frac{3}{3 + 2} \\
+&= \frac{3}{5} \\
+&= 0.6000 = 60.00\%
+\end{align*}
+
+\begin{table}[H]
+\centering
+\caption{Ringkasan Metrik Evaluasi}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Metrik} & \textbf{Nilai} & \textbf{Persentase (\%)} \\
+\hline
+Accuracy & 0.7000 & 70.00 \\
+Precision & 0.7500 & 75.00 \\
+Recall & 0.6000 & 60.00 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Analisis dan Pembahasan}
+Berdasarkan hasil evaluasi:
+\begin{itemize}
+    \item \textbf{Accuracy (70\%):} Model dapat memprediksi dengan benar sebanyak 70\% dari total data.
+    \item \textbf{Precision (75\%):} Dari semua prediksi "Lulus", 75\% diantaranya benar-benar lulus.
+    \item \textbf{Recall (60\%):} Model berhasil mengidentifikasi 60\% dari mahasiswa yang sebenarnya lulus.
+\end{itemize}
+
+Model ini memiliki precision yang cukup baik (75\%), yang berarti ketika model memprediksi mahasiswa lulus, prediksi tersebut cukup dapat dipercaya. Namun, recall yang relatif rendah (60\%) menunjukkan bahwa model masih melewatkan beberapa mahasiswa yang seharusnya lulus (False Negative = 2).
+
+\section{Latihan 3: Prediksi Cuaca dengan KNN}
+
+\subsection{Deskripsi Soal}
+Pada latihan ini, kita akan membangun model KNN untuk memprediksi tipe cuaca menggunakan dataset weather\_classification\_data.csv. Proses yang dilakukan meliputi:
+\begin{itemize}
+    \item Loading dan eksplorasi data
+    \item Preprocessing data (handling missing values, encoding)
+    \item Feature scaling
+    \item Pencarian k optimal
+    \item Evaluasi model
+\end{itemize}
+
+\subsection{Eksplorasi Data}
+
+\begin{lstlisting}[language=Python, caption=Load dan Eksplorasi Dataset]
+# Load dataset
+df_weather = pd.read_csv('../../Data/weather_classification_data.csv')
+
+# Info dataset
+print(f"Shape: {df_weather.shape}")
+print(f"Kolom: {df_weather.columns.tolist()}")
+print(df_weather.info())
+\end{lstlisting}
+
+Dataset weather\_classification\_data.csv berisi beberapa fitur meteorologi yang digunakan untuk memprediksi tipe cuaca. Fitur-fitur tersebut meliputi:
+\begin{itemize}
+    \item Temperature
+    \item Humidity
+    \item Wind Speed
+    \item Precipitation
+    \item Cloud Cover
+    \item Atmospheric Pressure
+    \item UV Index
+    \item Season
+    \item Visibility
+    \item Location
+\end{itemize}
+
+\subsection{Preprocessing Data}
+
+\subsubsection{Handling Missing Values}
+\begin{lstlisting}[language=Python, caption=Handling Missing Values]
+# Cek missing values
+print(df_weather.isnull().sum())
+
+# Isi missing values untuk kolom numerik dengan median
+numeric_cols = df_weather.select_dtypes(include=[np.number]).columns
+for col in numeric_cols:
+    if df_weather[col].isnull().sum() > 0:
+        df_weather[col].fillna(df_weather[col].median(), inplace=True)
+
+# Isi missing values untuk kolom kategorik dengan mode
+categorical_cols = df_weather.select_dtypes(include=['object']).columns
+for col in categorical_cols:
+    if df_weather[col].isnull().sum() > 0:
+        df_weather[col].fillna(df_weather[col].mode()[0], inplace=True)
+\end{lstlisting}
+
+\subsubsection{Encoding Variabel Kategorik}
+\begin{lstlisting}[language=Python, caption=Label Encoding untuk Variabel Kategorik]
+from sklearn.preprocessing import LabelEncoder
+
+le_cloud = LabelEncoder()
+le_season = LabelEncoder()
+le_location = LabelEncoder()
+le_weather = LabelEncoder()
+
+df_weather_encoded = df_weather.copy()
+df_weather_encoded['Cloud Cover'] = le_cloud.fit_transform(df_weather['Cloud Cover'])
+df_weather_encoded['Season'] = le_season.fit_transform(df_weather['Season'])
+df_weather_encoded['Location'] = le_location.fit_transform(df_weather['Location'])
+df_weather_encoded['Weather Type'] = le_weather.fit_transform(df_weather['Weather Type'])
+\end{lstlisting}
+
+\subsubsection{Split Data dan Standardisasi}
+\begin{lstlisting}[language=Python, caption=Split Data dan Feature Scaling]
+# Memisahkan features dan target
+X = df_weather_encoded.drop('Weather Type', axis=1)
+y = df_weather_encoded['Weather Type']
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Standardisasi features
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+\end{lstlisting}
+
+\subsection{Pencarian k Optimal}
+
+\begin{lstlisting}[language=Python, caption=Pencarian k Optimal dengan Cross-Validation]
+k_range = range(1, 31)
+cv_scores_weather = []
+
+for k in k_range:
+    knn = KNeighborsClassifier(n_neighbors=k)
+    scores = cross_val_score(knn, X_train_scaled, y_train, 
+                             cv=5, scoring='accuracy')
+    cv_scores_weather.append(scores.mean())
+
+best_k_weather = list(k_range)[np.argmax(cv_scores_weather)]
+best_score_weather = max(cv_scores_weather)
+\end{lstlisting}
+
+\subsection{Hasil dan Evaluasi}
+
+\subsubsection{Model Performance}
+\begin{lstlisting}[language=Python, caption=Training dan Evaluasi Model]
+# Membangun model dengan k terbaik
+knn_weather = KNeighborsClassifier(n_neighbors=best_k_weather)
+knn_weather.fit(X_train_scaled, y_train)
+
+# Prediksi
+y_train_pred = knn_weather.predict(X_train_scaled)
+y_test_pred = knn_weather.predict(X_test_scaled)
+
+# Evaluasi
+train_accuracy = accuracy_score(y_train, y_train_pred)
+test_accuracy = accuracy_score(y_test, y_test_pred)
+\end{lstlisting}
+
+\textbf{Hasil Akurasi:}
+\begin{itemize}
+    \item Training Accuracy: [hasil dari eksekusi]
+    \item Testing Accuracy: [hasil dari eksekusi]
+    \item Nilai k terbaik: [hasil dari eksekusi]
+    \item CV Accuracy: [hasil dari eksekusi]
+\end{itemize}
+
+\subsubsection{Classification Report}
+Classification report memberikan informasi detail tentang performa model untuk setiap kelas:
+
+\begin{lstlisting}[language=Python, caption=Classification Report]
+from sklearn.metrics import classification_report
+
+print(classification_report(y_test, y_test_pred, 
+                          target_names=le_weather.classes_))
+\end{lstlisting}
+
+\subsection{Analisis dan Pembahasan}
+Model KNN untuk prediksi cuaca menunjukkan performa yang [baik/cukup baik/perlu ditingkatkan] dengan testing accuracy sebesar [hasil]\%. Beberapa hal yang dapat dianalisis:
+
+\begin{enumerate}
+    \item \textbf{Pemilihan k:} Nilai k optimal yang dipilih adalah [hasil], yang menunjukkan bahwa model perlu mempertimbangkan [hasil] tetangga terdekat untuk membuat prediksi yang akurat.
+    
+    \item \textbf{Preprocessing:} Standardisasi fitur sangat penting dalam KNN karena algoritma ini sensitive terhadap skala data. Dengan standardisasi, semua fitur memiliki kontribusi yang seimbang dalam perhitungan jarak.
+    
+    \item \textbf{Performa Model:} Perbedaan antara training accuracy dan testing accuracy menunjukkan [tingkat overfitting/generalisasi yang baik]. Jika perbedaannya kecil, model memiliki generalisasi yang baik.
+    
+    \item \textbf{Confusion Matrix:} Dari confusion matrix dapat dilihat kelas mana yang paling sering salah diprediksi dan pola kesalahan prediksi model.
+\end{enumerate}
+
+\section{Kesimpulan}
+
+Berdasarkan praktikum yang telah dilakukan, dapat disimpulkan bahwa:
+
+\begin{enumerate}
+    \item Algoritma K-Nearest Neighbors (KNN) efektif untuk klasifikasi data dengan cara mencari k tetangga terdekat dan melakukan voting.
+    
+    \item Pemilihan nilai k yang optimal sangat penting untuk performa model. Nilai k yang terlalu kecil dapat menyebabkan overfitting, sedangkan nilai k yang terlalu besar dapat menyebabkan underfitting.
+    
+    \item Cross-validation merupakan metode yang baik untuk menentukan nilai k optimal dan menghindari overfitting.
+    
+    \item Confusion matrix dan metrik evaluasi (accuracy, precision, recall) memberikan gambaran komprehensif tentang performa model klasifikasi.
+    
+    \item Preprocessing data seperti handling missing values, encoding variabel kategorik, dan feature scaling sangat penting untuk meningkatkan performa model KNN.
+    
+    \item Model KNN untuk prediksi cuaca berhasil dibangun dengan akurasi [hasil]\%, menunjukkan bahwa algoritma ini dapat diterapkan untuk kasus real-world.
+\end{enumerate}
+
+\section{Daftar Pustaka}
+
+\begin{enumerate}
+    \item Scikit-learn Documentation. (2024). \textit{K-Nearest Neighbors}. https://scikit-learn.org/
+    
+    \item James, G., Witten, D., Hastie, T., \& Tibshirani, R. (2013). \textit{An Introduction to Statistical Learning}. Springer.
+    
+    \item Murphy, K. P. (2012). \textit{Machine Learning: A Probabilistic Perspective}. MIT Press.
+    
+    \item Géron, A. (2019). \textit{Hands-On Machine Learning with Scikit-Learn, Keras, and TensorFlow}. O'Reilly Media.
+\end{enumerate}
+
+\end{document}
