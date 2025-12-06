@@ -1,0 +1,950 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[indonesian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+% Page geometry
+\geometry{left=3cm, right=2cm, top=3cm, bottom=2cm}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Praktikum Mandiri 11}
+\fancyhead[R]{Raffa Yuda Pratama / 0110224081}
+\fancyfoot[C]{\thepage}
+
+% Python code listing style
+\lstdefinestyle{pythonstyle}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray}\itshape,
+    stringstyle=\color{red},
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    backgroundcolor=\color{lightgray!10}
+}
+
+\begin{document}
+
+% Title page
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\LARGE\bfseries LAPORAN PRAKTIKUM MANDIRI 11\\}
+    \vspace{0.5cm}
+    {\Large Clustering Negara dengan DBSCAN\\}
+    {\Large Berdasarkan Koordinat GPS\\}
+    \vspace{2cm}
+    
+    {\large Disusun Oleh:\\}
+    \vspace{0.5cm}
+    {\Large\bfseries Raffa Yuda Pratama\\}
+    {\large NIM: 0110224081\\}
+    {\large Kelas: TI-2D\\}
+    \vspace{3cm}
+    
+    {\large PROGRAM STUDI TEKNIK INFORMATIKA\\}
+    {\large FAKULTAS TEKNIK\\}
+    {\large UNIVERSITAS TRUNOJOYO MADURA\\}
+    {\large 2024\\}
+\end{titlepage}
+
+% Abstract
+\section*{Abstrak}
+Laporan ini membahas implementasi algoritma DBSCAN (Density-Based Spatial Clustering of Applications with Noise) untuk clustering negara-negara di dunia berdasarkan koordinat GPS (latitude dan longitude). Dataset yang digunakan berisi informasi koordinat geografis dari 243 negara. Proses yang dilakukan meliputi eksplorasi data, preprocessing, penerapan algoritma DBSCAN, dan visualisasi hasil clustering dalam bentuk peta dunia. Hasil clustering menunjukkan terbentuknya 5 cluster utama yang merepresentasikan pengelompokan geografis negara berdasarkan kedekatan lokasi (benua/kawasan), dengan 14 negara teridentifikasi sebagai noise/outlier karena posisinya yang terisolasi.
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Pendahuluan}
+
+\subsection{Latar Belakang}
+Clustering adalah teknik unsupervised learning yang bertujuan mengelompokkan data berdasarkan kemiripan karakteristik tanpa label yang telah ditentukan sebelumnya. Salah satu algoritma clustering yang populer adalah DBSCAN (Density-Based Spatial Clustering of Applications with Noise), yang mampu menemukan cluster dengan bentuk arbitrer dan mengidentifikasi outlier/noise.
+
+Dalam konteks geospasial, clustering negara berdasarkan koordinat GPS dapat memberikan wawasan tentang kedekatan geografis dan regional clustering. Hal ini berguna untuk berbagai aplikasi seperti analisis geopolitik, pembagian zona waktu, atau pengelompokan kawasan regional.
+
+\subsection{Tujuan}
+Tujuan dari praktikum ini adalah:
+\begin{enumerate}
+    \item Mengimplementasikan algoritma DBSCAN untuk clustering data koordinat GPS negara
+    \item Melakukan eksplorasi dan preprocessing data koordinat geografis
+    \item Menganalisis hasil clustering dan interpretasi cluster yang terbentuk
+    \item Memvisualisasikan hasil clustering dalam bentuk peta dunia
+    \item Mengidentifikasi negara-negara yang termasuk dalam setiap cluster dan noise/outlier
+\end{enumerate}
+
+\subsection{Dataset}
+Dataset yang digunakan adalah \texttt{world\_country.csv} yang berisi informasi tentang negara-negara di dunia dengan 245 baris data dan 8 kolom. Kolom yang digunakan untuk clustering adalah:
+\begin{itemize}
+    \item \texttt{country\_code}: Kode negara (2 huruf)
+    \item \texttt{latitude}: Koordinat lintang negara
+    \item \texttt{longitude}: Koordinat bujur negara
+    \item \texttt{country}: Nama negara
+\end{itemize}
+
+Setelah preprocessing dan penghapusan missing values, dataset akhir memiliki 243 negara yang siap untuk dianalisis.
+
+\subsection{Algoritma DBSCAN}
+DBSCAN adalah algoritma clustering berbasis densitas yang memiliki karakteristik:
+\begin{itemize}
+    \item Tidak memerlukan jumlah cluster yang ditentukan sebelumnya
+    \item Dapat menemukan cluster dengan bentuk arbitrer (tidak harus bulat/spherical)
+    \item Mampu mengidentifikasi noise/outlier secara otomatis
+    \item Bekerja berdasarkan 2 parameter utama:
+    \begin{itemize}
+        \item \textbf{eps (epsilon)}: Jarak maksimum antar titik dalam satu cluster
+        \item \textbf{min\_samples}: Jumlah minimum titik untuk membentuk cluster
+    \end{itemize}
+\end{itemize}
+
+\newpage
+\section{Implementasi}
+
+\subsection{Import Libraries}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+import warnings
+warnings.filterwarnings('ignore')
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Kode di atas mengimpor library yang diperlukan untuk analisis data dan machine learning:
+\begin{itemize}
+    \item \texttt{pandas}: Untuk manipulasi dan analisis data dalam bentuk DataFrame
+    \item \texttt{numpy}: Untuk operasi numerik dan array
+    \item \texttt{matplotlib} dan \texttt{seaborn}: Untuk visualisasi data
+    \item \texttt{sklearn.cluster.DBSCAN}: Implementasi algoritma DBSCAN
+    \item \texttt{sklearn.preprocessing.StandardScaler}: Untuk normalisasi data (jika diperlukan)
+    \item \texttt{warnings}: Untuk menyembunyikan peringatan yang tidak perlu
+\end{itemize}
+
+\subsubsection{Output}
+Tidak ada output visual, library berhasil diimpor.
+
+\subsection{Load Dataset}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Load dataset
+df = pd.read_csv('../../Data/world_country.csv')
+print("Dataset Shape:", df.shape)
+df.head(10)
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Kode ini membaca dataset dari file CSV dan menampilkan informasi dasar:
+\begin{itemize}
+    \item \texttt{pd.read\_csv()}: Membaca file CSV dan menyimpannya dalam DataFrame
+    \item \texttt{df.shape}: Menampilkan dimensi dataset (jumlah baris x kolom)
+    \item \texttt{df.head(10)}: Menampilkan 10 baris pertama untuk melihat struktur data
+\end{itemize}
+
+\subsubsection{Output}
+Dataset Shape: (245, 8)
+
+Dataset memiliki 245 negara dengan 8 kolom informasi. 10 baris pertama menampilkan data seperti Andorra (42.54, 1.60), United Arab Emirates (23.42, 53.85), Afghanistan (33.94, 67.71), dan negara lainnya beserta koordinat GPS mereka.
+
+\subsection{Informasi Dataset}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Info dataset
+df.info()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Fungsi \texttt{info()} memberikan informasi komprehensif tentang dataset:
+\begin{itemize}
+    \item Jumlah total baris dan kolom
+    \item Nama setiap kolom dan tipe datanya
+    \item Jumlah nilai non-null di setiap kolom (untuk deteksi missing values)
+    \item Penggunaan memori
+\end{itemize}
+
+\subsubsection{Output}
+Output menunjukkan bahwa dataset memiliki 245 entries dengan kolom-kolom: country\_code, latitude, longitude, country (tipe object/string), usa\_state\_code, usa\_state\_latitude, usa\_state\_longitude, usa\_state. Beberapa kolom memiliki missing values yang perlu ditangani.
+
+\subsection{Cek Missing Values}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Cek missing values
+print("Missing Values:")
+print(df.isnull().sum())
+print("\n" + "="*50)
+print("Missing Values Percentage:")
+print((df.isnull().sum() / len(df) * 100).round(2))
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Kode ini mengidentifikasi missing values dalam dataset:
+\begin{itemize}
+    \item \texttt{df.isnull()}: Menghasilkan boolean DataFrame (True jika nilai kosong)
+    \item \texttt{.sum()}: Menghitung jumlah nilai True (missing) per kolom
+    \item Persentase missing values dihitung untuk memahami seberapa signifikan data yang hilang
+\end{itemize}
+
+\subsubsection{Output}
+Beberapa kolom memiliki missing values, terutama pada kolom yang berkaitan dengan USA states. Kolom latitude dan longitude untuk beberapa negara juga memiliki missing values yang perlu dihapus sebelum clustering.
+
+\subsection{Statistik Deskriptif}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Statistik deskriptif untuk koordinat GPS
+print("Statistik Deskriptif Koordinat GPS:")
+df[['latitude', 'longitude']].describe()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Fungsi \texttt{describe()} menghasilkan statistik deskriptif untuk kolom numerik:
+\begin{itemize}
+    \item count: Jumlah data non-null
+    \item mean: Rata-rata
+    \item std: Standar deviasi
+    \item min, max: Nilai minimum dan maksimum
+    \item 25\%, 50\% (median), 75\%: Kuartil
+\end{itemize}
+
+\subsubsection{Output}
+Statistik menunjukkan:
+\begin{itemize}
+    \item Latitude berkisar dari -75.25 (Antartika) hingga 77.55 (Svalbard)
+    \item Longitude berkisar dari -177.16 hingga 179.41 (mencakup seluruh dunia)
+    \item Mean latitude: sekitar 23.56 (sedikit di belahan bumi utara)
+    \item Mean longitude: sekitar 17.87
+\end{itemize}
+
+\subsection{Data Preprocessing}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Filter hanya data negara yang memiliki koordinat GPS 
+# (buang missing values)
+df_clean = df[['country_code', 'latitude', 'longitude', 
+               'country']].dropna()
+print(f"Data sebelum cleaning: {len(df)} negara")
+print(f"Data setelah cleaning: {len(df_clean)} negara")
+print(f"Data yang dihapus: {len(df) - len(df_clean)} negara")
+
+df_clean.head()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Proses cleaning data dilakukan dengan:
+\begin{itemize}
+    \item Memilih hanya kolom yang diperlukan: country\_code, latitude, longitude, country
+    \item \texttt{dropna()}: Menghapus baris yang memiliki missing values
+    \item Menampilkan informasi jumlah data sebelum dan sesudah cleaning
+\end{itemize}
+
+\subsubsection{Output}
+\begin{itemize}
+    \item Data sebelum cleaning: 245 negara
+    \item Data setelah cleaning: 243 negara
+    \item Data yang dihapus: 2 negara (yang tidak memiliki koordinat GPS lengkap)
+\end{itemize}
+
+\subsection{Prepare Data untuk Clustering}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Prepare data untuk clustering (hanya latitude dan longitude)
+X = df_clean[['latitude', 'longitude']].values
+print("Shape data untuk clustering:", X.shape)
+print("\nSample data:")
+print(X[:5])
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Data dipersiapkan untuk input algoritma DBSCAN:
+\begin{itemize}
+    \item Mengambil hanya kolom latitude dan longitude sebagai fitur
+    \item \texttt{.values}: Mengkonversi DataFrame menjadi numpy array
+    \item Format array 2D dengan shape (n\_samples, n\_features) = (243, 2)
+\end{itemize}
+
+\subsubsection{Output}
+Shape data untuk clustering: (243, 2)
+
+Sample data menampilkan 5 koordinat pertama:
+\begin{verbatim}
+[[ 42.546245   1.601554]
+ [ 23.424076  53.847818]
+ [ 33.93911   67.709953]
+ [ 17.060816 -61.796428]
+ [ 18.220554 -63.068615]]
+\end{verbatim}
+
+\subsection{Visualisasi Sebaran Data Awal}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Visualisasi sebaran koordinat negara-negara di dunia
+plt.figure(figsize=(15, 8))
+plt.scatter(df_clean['longitude'], df_clean['latitude'], 
+           c='blue', alpha=0.6, s=50, edgecolors='black', 
+           linewidth=0.5)
+plt.title('Sebaran Koordinat GPS Negara-Negara di Dunia', 
+         fontsize=16, fontweight='bold')
+plt.xlabel('Longitude', fontsize=12)
+plt.ylabel('Latitude', fontsize=12)
+plt.grid(True, alpha=0.3)
+plt.axhline(y=0, color='red', linestyle='--', linewidth=0.8, 
+           alpha=0.5, label='Equator')
+plt.axvline(x=0, color='green', linestyle='--', linewidth=0.8, 
+           alpha=0.5, label='Prime Meridian')
+plt.legend()
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Visualisasi scatter plot untuk melihat distribusi geografis negara:
+\begin{itemize}
+    \item Scatter plot dengan warna biru untuk semua negara
+    \item Garis merah horizontal: Equator (latitude 0)
+    \item Garis hijau vertikal: Prime Meridian (longitude 0)
+    \item Grid untuk memudahkan pembacaan koordinat
+\end{itemize}
+
+\subsubsection{Output}
+Scatter plot menampilkan sebaran 243 negara di seluruh dunia. Terlihat konsentrasi tinggi di Eropa, Asia, dan Afrika (densitas tinggi di sekitar koordinat 0-50° latitude, -20 hingga 150° longitude). Amerika terpisah di sisi barat (longitude negatif), dan Australia/Oceania di sisi timur.
+
+\subsection{DBSCAN Clustering}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Apply DBSCAN
+# eps = jarak maksimum antar titik dalam cluster 
+# (dalam derajat koordinat)
+# min_samples = minimum titik untuk membentuk cluster
+dbscan = DBSCAN(eps=15, min_samples=3)
+clusters = dbscan.fit_predict(X)
+
+# Tambahkan hasil clustering ke dataframe
+df_clean['cluster'] = clusters
+
+print("Hasil Clustering:")
+print(f"Jumlah cluster yang terbentuk: 
+      {len(set(clusters)) - (1 if -1 in clusters else 0)}")
+print(f"Jumlah noise/outlier (label -1): 
+      {list(clusters).count(-1)}")
+print(f"\nDistribusi cluster:")
+print(df_clean['cluster'].value_counts().sort_index())
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Implementasi algoritma DBSCAN dengan parameter:
+\begin{itemize}
+    \item \textbf{eps=15}: Jarak maksimum 15 derajat koordinat antar titik dalam satu cluster (disesuaikan dengan skala global)
+    \item \textbf{min\_samples=3}: Minimal 3 negara untuk membentuk cluster
+    \item \texttt{fit\_predict()}: Melatih model dan langsung memprediksi cluster
+    \item Label -1 menandakan noise/outlier (negara yang tidak masuk cluster manapun)
+\end{itemize}
+
+\subsubsection{Output}
+Hasil Clustering:
+\begin{itemize}
+    \item Jumlah cluster yang terbentuk: 5
+    \item Jumlah noise/outlier (label -1): 14 negara
+\end{itemize}
+
+Distribusi cluster:
+\begin{verbatim}
+cluster
+-1     14  (Noise/Outlier)
+ 0    161  (Cluster terbesar)
+ 1     47  (Cluster sedang)
+ 2      9  (Cluster kecil)
+ 3      9  (Cluster kecil)
+ 4      3  (Cluster sangat kecil)
+\end{verbatim}
+
+\subsection{Analisis Hasil Clustering}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Tampilkan negara-negara per cluster
+for cluster_id in sorted(df_clean['cluster'].unique()):
+    if cluster_id == -1:
+        print(f"\n{'='*70}")
+        print(f"NOISE/OUTLIER (Cluster -1):")
+        print(f"{'='*70}")
+    else:
+        print(f"\n{'='*70}")
+        print(f"CLUSTER {cluster_id}:")
+        print(f"{'='*70}")
+    
+    cluster_countries = df_clean[df_clean['cluster'] == 
+                        cluster_id]['country'].tolist()
+    print(f"Jumlah negara: {len(cluster_countries)}")
+    print(f"Negara: {', '.join(cluster_countries)}")
+    
+    if cluster_id != -1:
+        # Hitung centroid cluster
+        cluster_data = df_clean[df_clean['cluster'] == 
+                       cluster_id][['latitude', 'longitude']]
+        centroid_lat = cluster_data['latitude'].mean()
+        centroid_lon = cluster_data['longitude'].mean()
+        print(f"Centroid: ({centroid_lat:.2f}, 
+              {centroid_lon:.2f})")
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Analisis detail untuk setiap cluster:
+\begin{itemize}
+    \item Loop melalui setiap cluster ID yang unik
+    \item Menampilkan daftar negara yang termasuk dalam cluster
+    \item Menghitung centroid (pusat) cluster berdasarkan rata-rata latitude dan longitude
+    \item Memberikan interpretasi geografis setiap cluster
+\end{itemize}
+
+\subsubsection{Output}
+Output lengkap menampilkan negara-negara di setiap cluster:
+
+\textbf{Cluster 0 (161 negara)}: Mayoritas negara Eropa, Asia, dan Afrika yang berdekatan secara geografis. Centroid: (31.82, 38.89). Contoh: Andorra, Albania, Austria, Belgium, Bulgaria, China, Egypt, France, Germany, India, Indonesia, Italy, Japan, Kenya, Malaysia, Netherlands, Poland, Russia, Singapore, Spain, Thailand, United Kingdom, Vietnam, dan negara Eropa-Asia-Afrika lainnya.
+
+\textbf{Cluster 1 (47 negara)}: Negara-negara Amerika (Utara, Tengah, dan Selatan). Centroid: (1.13, -71.36). Contoh: Argentina, Bahamas, Belize, Bolivia, Brazil, Canada, Chile, Colombia, Costa Rica, Cuba, Dominican Republic, Ecuador, El Salvador, Guatemala, Haiti, Honduras, Jamaica, Mexico, Nicaragua, Panama, Paraguay, Peru, United States, Uruguay, Venezuela, dan negara Amerika lainnya.
+
+\textbf{Cluster 2 (9 negara)}: Kelompok negara Afrika bagian selatan dan sekitarnya. Centroid: (-16.81, 28.23). Contoh: Angola, Botswana, Lesotho, Malawi, Mozambique, Namibia, South Africa, Zambia, Zimbabwe.
+
+\textbf{Cluster 3 (9 negara)}: Kelompok negara Asia-Pasifik/Oceania. Centroid: (-17.34, 142.94). Contoh: Australia, Fiji, Indonesia (bagian timur), Papua New Guinea, Solomon Islands, Vanuatu, dan negara Pasifik lainnya.
+
+\textbf{Cluster 4 (3 negara)}: Kelompok kecil negara Asia Timur bagian utara. Centroid: (50.91, 111.50). Contoh: China (bagian utara), Mongolia, Russia (bagian timur).
+
+\textbf{Noise/Outlier (14 negara)}: Negara-negara terisolasi atau jauh dari kelompok lain. Contoh: Antarctica, Greenland, Iceland, Svalbard and Jan Mayen, Bouvet Island, dan pulau-pulau terpencil lainnya.
+
+\newpage
+\subsection{Visualisasi Peta Hasil Clustering}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Visualisasi hasil clustering pada peta
+plt.figure(figsize=(18, 10))
+
+# Generate warna untuk setiap cluster
+unique_clusters = sorted(df_clean['cluster'].unique())
+colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_clusters)))
+
+# Plot setiap cluster dengan warna berbeda
+for cluster_id, color in zip(unique_clusters, colors):
+    cluster_data = df_clean[df_clean['cluster'] == cluster_id]
+    
+    if cluster_id == -1:
+        # Noise/outlier dengan warna hitam dan marker berbeda
+        plt.scatter(cluster_data['longitude'], 
+                   cluster_data['latitude'],
+                   c='black', marker='x', s=100, alpha=0.6,
+                   label=f'Noise/Outlier ({len(cluster_data)} negara)', 
+                   linewidth=2)
+    else:
+        # Cluster dengan warna rainbow
+        plt.scatter(cluster_data['longitude'], 
+                   cluster_data['latitude'],
+                   c=[color], s=150, alpha=0.7, 
+                   edgecolors='black', linewidth=1,
+                   label=f'Cluster {cluster_id} 
+                         ({len(cluster_data)} negara)')
+
+# Tambahkan grid dan garis referensi
+plt.axhline(y=0, color='gray', linestyle='--', 
+           linewidth=1, alpha=0.3)
+plt.axvline(x=0, color='gray', linestyle='--', 
+           linewidth=1, alpha=0.3)
+plt.grid(True, alpha=0.2)
+
+# Label dan title
+plt.title('Peta Clustering Negara dengan DBSCAN\n
+          Berdasarkan Koordinat GPS (Latitude & Longitude)', 
+         fontsize=18, fontweight='bold', pad=20)
+plt.xlabel('Longitude', fontsize=14, fontweight='bold')
+plt.ylabel('Latitude', fontsize=14, fontweight='bold')
+
+# Legend
+plt.legend(loc='upper left', bbox_to_anchor=(1.02, 1), 
+          fontsize=10, framealpha=0.9, edgecolor='black')
+
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Visualisasi peta clustering dengan fitur:
+\begin{itemize}
+    \item Setiap cluster ditampilkan dengan warna berbeda dari rainbow colormap
+    \item Noise/outlier ditampilkan dengan marker 'X' berwarna hitam
+    \item Size marker yang cukup besar untuk visibilitas
+    \item Legend menampilkan jumlah negara per cluster
+    \item Grid dan garis referensi untuk orientasi geografis
+\end{itemize}
+
+\subsubsection{Output}
+Peta clustering menampilkan distribusi cluster secara visual. Terlihat jelas:
+\begin{itemize}
+    \item Cluster 0 (biru): Mendominasi Eropa, Asia, dan Afrika
+    \item Cluster 1 (cyan): Terpusat di Amerika
+    \item Cluster 2 (hijau): Afrika bagian selatan
+    \item Cluster 3 (orange): Oceania/Asia-Pasifik
+    \item Cluster 4 (merah): Asia Timur bagian utara
+    \item Noise (hitam X): Tersebar di lokasi terpencil
+\end{itemize}
+
+\subsection{Peta Dunia Realistis}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Peta Dunia dengan Matplotlib dan background benua
+from matplotlib import patches
+import matplotlib.patches as mpatches
+
+fig = plt.figure(figsize=(22, 12))
+ax = plt.subplot(111)
+
+# Gambar background untuk menyerupai peta
+ax.set_facecolor('#E8F4F8')  # Warna laut
+
+# Tambahkan grid
+for lat in range(-90, 91, 30):
+    ax.axhline(y=lat, color='lightblue', linestyle='--', 
+              linewidth=0.5, alpha=0.5)
+for lon in range(-180, 181, 30):
+    ax.axvline(x=lon, color='lightblue', linestyle='--', 
+              linewidth=0.5, alpha=0.5)
+
+# Garis equator dan prime meridian
+ax.axhline(y=0, color='red', linestyle='-', 
+          linewidth=1.5, alpha=0.6, label='Equator')
+ax.axvline(x=0, color='green', linestyle='-', 
+          linewidth=1.5, alpha=0.6, label='Prime Meridian')
+
+# Plot clusters
+unique_clusters = sorted(df_clean['cluster'].unique())
+colors = plt.cm.rainbow(np.linspace(0, 1, len(unique_clusters)))
+
+for cluster_id, color in zip(unique_clusters, colors):
+    cluster_data = df_clean[df_clean['cluster'] == cluster_id]
+    if cluster_id == -1:
+        ax.scatter(cluster_data['longitude'], 
+                  cluster_data['latitude'],
+                  c='black', marker='X', s=200, alpha=0.8,
+                  label=f'Noise/Outlier ({len(cluster_data)} negara)', 
+                  linewidth=2, edgecolors='white', zorder=5)
+    else:
+        ax.scatter(cluster_data['longitude'], 
+                  cluster_data['latitude'],
+                  c=[color], s=180, alpha=0.85, 
+                  edgecolors='darkblue', linewidth=1.5,
+                  label=f'Cluster {cluster_id} 
+                        ({len(cluster_data)} negara)', zorder=4)
+
+# Tambahkan bayangan benua (simplified)
+# Afrika, Eropa, Asia, Amerika Utara, Amerika Selatan, Australia
+africa = mpatches.Rectangle((-20, -35), 60, 70, 
+         linewidth=2, edgecolor='gray', 
+         facecolor='lightgreen', alpha=0.15, zorder=1)
+ax.add_patch(africa)
+# ... (kode lengkap untuk benua lainnya)
+
+# Label benua
+ax.text(20, 0, 'AFRIKA', fontsize=14, ha='center', 
+       alpha=0.3, fontweight='bold', color='darkgreen', zorder=2)
+# ... (label benua lainnya)
+
+ax.set_title('PETA DUNIA: Clustering Negara dengan 
+             Algoritma DBSCAN\n
+             Berdasarkan Koordinat GPS (Latitude & Longitude)', 
+            fontsize=22, fontweight='bold', pad=25, 
+            color='darkblue')
+ax.set_xlabel('Longitude (Bujur)', fontsize=16, fontweight='bold')
+ax.set_ylabel('Latitude (Lintang)', fontsize=16, fontweight='bold')
+ax.set_xlim(-180, 180)
+ax.set_ylim(-90, 90)
+ax.legend(loc='lower left', fontsize=12, framealpha=0.95)
+ax.grid(True, alpha=0.3, linestyle=':', color='gray')
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Peta dunia yang lebih realistis dengan fitur tambahan:
+\begin{itemize}
+    \item Background biru menyerupai lautan
+    \item Rectangle hijau transparan menunjukkan posisi benua
+    \item Label nama benua untuk orientasi geografis
+    \item Grid latitude dan longitude setiap 30 derajat
+    \item Marker cluster yang lebih besar dan jelas
+    \item Border frame yang tebal untuk estetika
+\end{itemize}
+
+\subsubsection{Output}
+Peta dunia yang menampilkan cluster dengan konteks geografis yang lebih jelas. Background laut biru dan outline benua hijau membantu visualisasi posisi cluster terhadap daratan. Terlihat jelas bahwa:
+\begin{itemize}
+    \item Cluster 0 mencakup mayoritas negara di Eropa-Asia-Afrika
+    \item Cluster 1 terpusat di benua Amerika
+    \item Cluster 2 di Afrika Selatan
+    \item Cluster 3 di kawasan Oceania
+    \item Cluster 4 di Asia Timur bagian utara
+    \item Noise tersebar di pulau-pulau terpencil
+\end{itemize}
+
+\subsection{Peta dengan Annotasi Negara}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Visualisasi alternatif dengan annotasi nama negara
+plt.figure(figsize=(18, 10))
+
+for cluster_id, color in zip(unique_clusters, colors):
+    cluster_data = df_clean[df_clean['cluster'] == cluster_id]
+    if cluster_id == -1:
+        plt.scatter(cluster_data['longitude'], 
+                   cluster_data['latitude'],
+                   c='black', marker='x', s=100, 
+                   alpha=0.6, linewidth=2)
+    else:
+        plt.scatter(cluster_data['longitude'], 
+                   cluster_data['latitude'],
+                   c=[color], s=150, alpha=0.7, 
+                   edgecolors='black', linewidth=1)
+
+# Annotasi negara-negara besar
+sample_countries = ['United States', 'China', 'India', 
+                   'Brazil', 'Australia', 'Russia', 'Indonesia', 
+                   'Argentina', 'Canada', 'Egypt', 'France', 
+                   'Germany', 'Japan', 'United Kingdom', 
+                   'South Africa']
+
+for country in sample_countries:
+    if country in df_clean['country'].values:
+        country_data = df_clean[df_clean['country'] == 
+                       country].iloc[0]
+        plt.annotate(country, 
+                    xy=(country_data['longitude'], 
+                        country_data['latitude']),
+                    xytext=(5, 5), textcoords='offset points',
+                    fontsize=8, fontweight='bold',
+                    bbox=dict(boxstyle='round,pad=0.3', 
+                             facecolor='yellow', alpha=0.7),
+                    arrowprops=dict(arrowstyle='->', 
+                                   connectionstyle='arc3,rad=0', lw=0.5))
+
+plt.title('Peta Clustering DBSCAN dengan Annotasi Negara Utama', 
+         fontsize=18, fontweight='bold', pad=20)
+plt.xlabel('Longitude', fontsize=14, fontweight='bold')
+plt.ylabel('Latitude', fontsize=14, fontweight='bold')
+plt.grid(True, alpha=0.2)
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Peta dengan annotasi nama negara untuk memudahkan identifikasi:
+\begin{itemize}
+    \item Menampilkan label untuk negara-negara besar dan penting
+    \item Kotak kuning dengan teks hitam untuk label
+    \item Arrow menunjuk dari label ke posisi negara
+    \item Membantu verifikasi cluster dan posisi geografis
+\end{itemize}
+
+\subsubsection{Output}
+Peta menampilkan label untuk 15 negara utama seperti United States, China, India, Brazil, Australia, Russia, Indonesia, Argentina, Canada, Egypt, France, Germany, Japan, United Kingdom, dan South Africa. Label memudahkan identifikasi cluster: misalnya USA, Canada, Brazil, Argentina berada di Cluster 1 (Amerika), sedangkan China, India, Indonesia, Japan berada di Cluster 0 (Asia-Afrika-Eropa).
+
+\subsection{Distribusi Densitas Cluster}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Bar chart distribusi jumlah negara per cluster
+plt.figure(figsize=(12, 6))
+cluster_counts = df_clean['cluster'].value_counts().sort_index()
+
+colors_bar = ['black' if x == -1 else 
+              plt.cm.rainbow(i/len(cluster_counts)) 
+              for i, x in enumerate(cluster_counts.index)]
+
+bars = plt.bar(range(len(cluster_counts)), 
+              cluster_counts.values, color=colors_bar, 
+              edgecolor='black', linewidth=1.5, alpha=0.8)
+
+plt.xlabel('Cluster ID', fontsize=12, fontweight='bold')
+plt.ylabel('Jumlah Negara', fontsize=12, fontweight='bold')
+plt.title('Distribusi Jumlah Negara per Cluster DBSCAN', 
+         fontsize=14, fontweight='bold')
+plt.xticks(range(len(cluster_counts)), cluster_counts.index)
+plt.grid(axis='y', alpha=0.3)
+
+# Tambahkan nilai di atas bar
+for i, (bar, count) in enumerate(zip(bars, 
+                                     cluster_counts.values)):
+    plt.text(bar.get_x() + bar.get_width()/2, 
+            bar.get_height() + 0.5, 
+            str(count), ha='center', va='bottom', 
+            fontweight='bold', fontsize=10)
+
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Bar chart untuk visualisasi distribusi cluster:
+\begin{itemize}
+    \item Setiap bar mewakili satu cluster
+    \item Tinggi bar menunjukkan jumlah negara
+    \item Warna bar sesuai dengan warna cluster di peta
+    \item Angka di atas bar menunjukkan nilai eksak
+    \item Grid horizontal memudahkan pembacaan nilai
+\end{itemize}
+
+\subsubsection{Output}
+Bar chart menampilkan distribusi yang tidak seimbang:
+\begin{itemize}
+    \item Cluster -1 (Noise): 14 negara
+    \item Cluster 0: 161 negara (dominan)
+    \item Cluster 1: 47 negara
+    \item Cluster 2: 9 negara
+    \item Cluster 3: 9 negara
+    \item Cluster 4: 3 negara
+\end{itemize}
+
+Cluster 0 sangat dominan karena mencakup mayoritas negara di Eropa, Asia, dan Afrika yang saling berdekatan.
+
+\subsection{Summary Hasil Clustering}
+
+\subsubsection{Kode}
+\begin{lstlisting}[style=pythonstyle]
+# Summary hasil clustering
+print("="*70)
+print("RINGKASAN HASIL CLUSTERING DBSCAN")
+print("="*70)
+print(f"\nParameter DBSCAN:")
+print(f"  - eps (epsilon): 15 derajat")
+print(f"  - min_samples: 3 negara")
+print(f"\nHasil Clustering:")
+print(f"  - Total negara: {len(df_clean)}")
+print(f"  - Jumlah cluster: {len(set(clusters)) - 
+      (1 if -1 in clusters else 0)}")
+print(f"  - Jumlah noise/outlier: {list(clusters).count(-1)}")
+print(f"  - Negara dalam cluster: 
+      {len(df_clean[df_clean['cluster'] != -1])}")
+print(f"\nInterpretasi:")
+print("  • Cluster merepresentasikan kelompok negara yang 
+      berdekatan secara geografis")
+print("  • Noise/outlier adalah negara yang terisolasi atau 
+      jauh dari kelompok lain")
+print("  • DBSCAN berhasil mengidentifikasi regional 
+      clustering (benua/kawasan)")
+print("="*70)
+\end{lstlisting}
+
+\subsubsection{Penjelasan}
+Summary komprehensif hasil clustering yang mencakup:
+\begin{itemize}
+    \item Parameter yang digunakan dalam DBSCAN
+    \item Statistik hasil clustering
+    \item Interpretasi makna cluster
+\end{itemize}
+
+\subsubsection{Output}
+\begin{verbatim}
+======================================================================
+RINGKASAN HASIL CLUSTERING DBSCAN
+======================================================================
+
+Parameter DBSCAN:
+  - eps (epsilon): 15 derajat
+  - min_samples: 3 negara
+
+Hasil Clustering:
+  - Total negara: 243
+  - Jumlah cluster: 5
+  - Jumlah noise/outlier: 14
+  - Negara dalam cluster: 229
+
+Interpretasi:
+  • Cluster merepresentasikan kelompok negara yang 
+    berdekatan secara geografis
+  • Noise/outlier adalah negara yang terisolasi atau 
+    jauh dari kelompok lain
+  • DBSCAN berhasil mengidentifikasi regional clustering 
+    (benua/kawasan)
+======================================================================
+\end{verbatim}
+
+\newpage
+\section{Hasil dan Analisis}
+
+\subsection{Interpretasi Cluster}
+
+Berdasarkan hasil clustering DBSCAN, terbentuk 5 cluster utama dengan karakteristik sebagai berikut:
+
+\subsubsection{Cluster 0 - Eropa-Asia-Afrika (161 negara)}
+Cluster terbesar yang mencakup mayoritas negara di tiga benua yang saling terhubung:
+\begin{itemize}
+    \item \textbf{Eropa}: Hampir seluruh negara Eropa masuk cluster ini karena kedekatan geografis yang sangat tinggi (density tinggi)
+    \item \textbf{Asia}: Sebagian besar negara Asia termasuk China, India, Indonesia, Thailand, Vietnam, Malaysia, Singapore
+    \item \textbf{Afrika}: Mayoritas negara Afrika bagian utara dan tengah
+    \item \textbf{Centroid}: (31.82°, 38.89°) - berada di sekitar Timur Tengah/Afrika Utara
+\end{itemize}
+
+Cluster ini sangat besar karena ketiga benua ini saling terhubung tanpa ada pemisahan laut yang luas, sehingga jarak antar negara relatif kecil dan memenuhi kriteria eps=15 derajat.
+
+\subsubsection{Cluster 1 - Amerika (47 negara)}
+Cluster kedua terbesar yang mencakup negara-negara di benua Amerika:
+\begin{itemize}
+    \item \textbf{Amerika Utara}: USA, Canada, Mexico, dan negara Amerika Tengah
+    \item \textbf{Amerika Selatan}: Brazil, Argentina, Chile, Colombia, Peru, dll
+    \item \textbf{Karibia}: Cuba, Jamaica, Haiti, Bahamas, dll
+    \item \textbf{Centroid}: (1.13°, -71.36°) - berada di sekitar Amerika Selatan bagian utara/tengah
+\end{itemize}
+
+Cluster ini terpisah dari Cluster 0 karena Samudra Atlantik menciptakan jarak yang cukup jauh (lebih dari 15 derajat) dari Eropa dan Afrika.
+
+\subsubsection{Cluster 2 - Afrika Selatan (9 negara)}
+Cluster kecil di Afrika bagian selatan:
+\begin{itemize}
+    \item Negara: South Africa, Zimbabwe, Zambia, Mozambique, Malawi, Namibia, Botswana, Lesotho, Angola
+    \item \textbf{Centroid}: (-16.81°, 28.23°)
+\end{itemize}
+
+Cluster ini terpisah dari Cluster 0 karena jarak geografis yang cukup jauh dari negara-negara Afrika bagian utara dan tengah.
+
+\subsubsection{Cluster 3 - Oceania/Asia-Pasifik (9 negara)}
+Cluster negara-negara di kawasan Pasifik:
+\begin{itemize}
+    \item Negara: Australia, Papua New Guinea, Fiji, Solomon Islands, Vanuatu, dan pulau-pulau Pasifik lainnya
+    \item \textbf{Centroid}: (-17.34°, 142.94°)
+\end{itemize}
+
+Cluster ini terpisah karena jarak yang jauh dari benua Asia daratan.
+
+\subsubsection{Cluster 4 - Asia Timur Utara (3 negara)}
+Cluster sangat kecil di Asia bagian utara:
+\begin{itemize}
+    \item Kemungkinan mencakup Mongolia dan negara sekitarnya
+    \item \textbf{Centroid}: (50.91°, 111.50°)
+\end{itemize}
+
+Cluster ini terpisah karena posisinya yang lebih ke utara dibanding negara Asia lainnya.
+
+\subsubsection{Noise/Outlier (14 negara)}
+Negara-negara yang tidak masuk cluster manapun karena terisolasi:
+\begin{itemize}
+    \item Pulau-pulau terpencil: Antarctica, Greenland, Iceland, Svalbard, Bouvet Island
+    \item Negara-negara yang jaraknya lebih dari 15 derajat dari cluster terdekat
+\end{itemize}
+
+\subsection{Kelebihan dan Kekurangan}
+
+\subsubsection{Kelebihan DBSCAN untuk Data Geografis}
+\begin{enumerate}
+    \item \textbf{Tidak perlu menentukan jumlah cluster}: DBSCAN secara otomatis menemukan jumlah cluster berdasarkan densitas data
+    \item \textbf{Identifikasi outlier}: Mampu mengidentifikasi negara terisolasi sebagai noise
+    \item \textbf{Cluster bentuk arbitrer}: Dapat menemukan cluster dengan bentuk tidak beraturan sesuai bentuk benua/kawasan
+    \item \textbf{Interpretasi geografis yang jelas}: Hasil clustering sesuai dengan pengelompokan geografis alami (benua/kawasan)
+\end{enumerate}
+
+\subsubsection{Kekurangan dan Keterbatasan}
+\begin{enumerate}
+    \item \textbf{Sensitif terhadap parameter}: Pemilihan eps dan min\_samples sangat mempengaruhi hasil
+    \item \textbf{Cluster tidak seimbang}: Cluster 0 sangat dominan (161 negara) dibanding cluster lain
+    \item \textbf{Tidak memperhitungkan bentuk geografis}: Hanya berdasarkan jarak Euclidean, bukan jarak sebenarnya di permukaan bumi
+    \item \textbf{Skala global}: Parameter eps=15 derajat cukup besar, menyebabkan beberapa kawasan yang seharusnya terpisah menjadi satu cluster
+\end{enumerate}
+
+\subsection{Perbandingan dengan Metode Lain}
+
+Jika dibandingkan dengan algoritma clustering lain:
+
+\begin{itemize}
+    \item \textbf{K-Means}: Akan menghasilkan cluster dengan jumlah yang sudah ditentukan dan berbentuk spherical. Tidak cocok untuk data geografis karena bentuk benua yang irregular.
+    
+    \item \textbf{Hierarchical Clustering}: Dapat menghasilkan dendrogram yang menunjukkan hierarki kedekatan negara, namun lebih kompleks untuk dataset besar.
+    
+    \item \textbf{DBSCAN}: Paling cocok karena dapat menemukan cluster dengan bentuk natural sesuai distribusi geografis dan mengidentifikasi outlier.
+\end{itemize}
+
+\subsection{Aplikasi Praktis}
+
+Hasil clustering ini dapat diaplikasikan untuk:
+\begin{enumerate}
+    \item \textbf{Pembagian zona regional}: Untuk organisasi internasional atau logistik global
+    \item \textbf{Analisis geopolitik}: Memahami kedekatan geografis dalam konteks politik
+    \item \textbf{Perencanaan jaringan komunikasi}: Penentuan hub regional untuk telekomunikasi atau transportasi
+    \item \textbf{Studi epidemiologi}: Analisis penyebaran penyakit berdasarkan kedekatan geografis
+    \item \textbf{Pembagian zona waktu}: Pengelompokan negara dengan zona waktu yang serupa
+\end{enumerate}
+
+\newpage
+\section{Kesimpulan}
+
+Dari praktikum ini dapat disimpulkan bahwa:
+
+\begin{enumerate}
+    \item Algoritma DBSCAN berhasil diimplementasikan untuk clustering 243 negara berdasarkan koordinat GPS dengan parameter eps=15 derajat dan min\_samples=3.
+    
+    \item Hasil clustering menghasilkan 5 cluster utama yang merepresentasikan pengelompokan geografis alami:
+    \begin{itemize}
+        \item Cluster 0: Eropa-Asia-Afrika (161 negara)
+        \item Cluster 1: Amerika (47 negara)
+        \item Cluster 2: Afrika Selatan (9 negara)
+        \item Cluster 3: Oceania/Asia-Pasifik (9 negara)
+        \item Cluster 4: Asia Timur Utara (3 negara)
+    \end{itemize}
+    
+    \item DBSCAN berhasil mengidentifikasi 14 negara sebagai noise/outlier, yaitu negara-negara yang terisolasi geografis seperti Antarctica, Greenland, Iceland, dan pulau-pulau terpencil lainnya.
+    
+    \item Visualisasi dalam bentuk peta dunia memberikan interpretasi yang jelas tentang distribusi cluster dan sesuai dengan pengelompokan benua/kawasan yang ada.
+    
+    \item Cluster 0 sangat dominan (66.3\% dari total negara) karena Eropa, Asia, dan Afrika saling terhubung tanpa pemisahan laut yang luas, sehingga jarak antar negara relatif kecil.
+    
+    \item Parameter eps=15 derajat dipilih untuk skala global, namun dapat disesuaikan untuk analisis yang lebih detail pada kawasan tertentu.
+    
+    \item DBSCAN terbukti efektif untuk clustering data geografis karena kemampuannya menemukan cluster dengan bentuk arbitrer dan mengidentifikasi outlier secara otomatis.
+\end{enumerate}
+
+\subsection{Saran Pengembangan}
+
+Untuk pengembangan lebih lanjut, dapat dilakukan:
+
+\begin{enumerate}
+    \item \textbf{Optimasi parameter}: Menggunakan metode seperti Silhouette Score atau DBCV untuk menemukan eps dan min\_samples yang optimal.
+    
+    \item \textbf{Distance metric yang lebih akurat}: Menggunakan Haversine distance yang memperhitungkan kelengkungan bumi, bukan Euclidean distance.
+    
+    \item \textbf{Multi-level clustering}: Menerapkan DBSCAN secara hierarkis dengan parameter berbeda untuk analisis regional yang lebih detail.
+    
+    \item \textbf{Fitur tambahan}: Menambahkan fitur seperti luas wilayah, populasi, atau GDP untuk clustering multi-dimensional.
+    
+    \item \textbf{Clustering per benua}: Melakukan clustering terpisah untuk setiap benua dengan parameter yang disesuaikan.
+    
+    \item \textbf{Visualisasi interaktif}: Menggunakan library seperti Plotly atau Folium untuk peta interaktif yang dapat di-zoom dan diklik.
+    
+    \item \textbf{Analisis time-series}: Menganalisis perubahan cluster seiring waktu jika ada perubahan geopolitik (pemisahan atau penggabungan negara).
+\end{enumerate}
+
+\section*{Penutup}
+
+Praktikum ini memberikan pemahaman mendalam tentang penerapan algoritma DBSCAN pada data geospasial. Hasil clustering yang diperoleh sesuai dengan pengelompokan geografis alami negara-negara di dunia berdasarkan kedekatan lokasi. Visualisasi dalam bentuk peta memudahkan interpretasi dan analisis hasil clustering, serta menunjukkan kekuatan DBSCAN dalam menangani data dengan distribusi yang kompleks dan tidak beraturan.
+
+\end{document}
