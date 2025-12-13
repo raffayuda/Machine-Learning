@@ -1,0 +1,414 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[indonesian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\geometry{a4paper, left=3cm, right=3cm, top=3cm, bottom=3cm}
+
+% Setup untuk kode Python
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{gray!10},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=2,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)},
+    xleftmargin=2em,
+    framexleftmargin=1.5em
+}
+
+% Header dan Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Laporan Praktikum PCA}
+\fancyhead[R]{Machine Learning}
+\fancyfoot[C]{\thepage}
+
+\begin{document}
+
+\noindent
+\textbf{Praktikum PCA - Breast Cancer} \hfill \textbf{Raffa Yuda Pratama / 0110224081}
+
+\vspace{1em}
+
+\begin{center}
+\textbf{\large Implementasi Principal Component Analysis (PCA)} \\
+\textbf{\large untuk Klasifikasi Breast Cancer}
+\end{center}
+
+\vspace{1em}
+
+\section{Pendahuluan}
+
+Principal Component Analysis (PCA) adalah teknik reduksi dimensi yang mengubah fitur-fitur berkorelasi menjadi komponen principal yang tidak berkorelasi. Praktikum ini mengimplementasikan PCA pada dataset Breast Cancer untuk mengurangi 30 fitur menjadi 3 komponen principal, kemudian membandingkan performa klasifikasi SVM dengan dan tanpa PCA.
+
+\section{Dataset}
+
+Dataset Breast Cancer memiliki karakteristik:
+\begin{itemize}
+    \item Total sampel: 569 data
+    \item Fitur: 30 fitur numerik (mean, standard error, worst values dari 10 karakteristik sel)
+    \item Target: Diagnosis (M=Malignant/ganas, B=Benign/jinak)
+    \item File: \texttt{breast\_cancer.csv}
+\end{itemize}
+
+\section{Implementasi}
+
+\subsection{Import Library}
+
+\begin{lstlisting}[caption=Import Library yang Diperlukan]
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+\end{lstlisting}
+
+\textbf{Penjelasan:} Import library untuk manipulasi data (pandas, numpy), machine learning (sklearn), dan visualisasi (matplotlib).
+
+\subsection{Load dan Eksplorasi Data}
+
+\begin{lstlisting}[caption=Load Dataset]
+df = pd.read_csv('../../Data/breast_cancer.csv')
+print(f"Dataset shape: {df.shape}")
+df.head()
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Dataset shape: (569, 33)
+\end{verbatim}
+
+Dataset memiliki 569 baris dan 33 kolom (termasuk id, diagnosis, 30 fitur, dan 1 kolom sampah "Unnamed: 32").
+
+\begin{lstlisting}[caption=Informasi Dataset]
+df.info()
+df.describe()
+\end{lstlisting}
+
+\textbf{Penjelasan:} \texttt{df.info()} menampilkan tipe data dan jumlah non-null values. \texttt{df.describe()} menampilkan statistik deskriptif (mean, std, min, max, quartiles) untuk setiap fitur numerik.
+
+\begin{lstlisting}[caption=Distribusi Kelas Target]
+print("Kelas Diagnosis:")
+df['diagnosis'].value_counts()
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+B    357
+M    212
+\end{verbatim}
+
+Dataset memiliki 357 kasus Benign (jinak) dan 212 kasus Malignant (ganas).
+
+\subsection{Data Cleaning dan Preprocessing}
+
+\begin{lstlisting}[caption=Pembersihan Data]
+# Hapus kolom yang SEMUA nilainya NaN
+df_clean = df.dropna(axis=1, how='all')
+print(f"Setelah hapus kolom sampah: {df_clean.shape}")
+
+# Hapus baris dengan missing values (jika ada)
+df_clean = df_clean.dropna()
+
+# Pisahkan fitur dan label
+X = df_clean.drop(['id', 'diagnosis'], axis=1).values
+y = df_clean['diagnosis'].map({'M': 1, 'B': 0}).values
+
+print("Shape X : ", X.shape)
+print("Shape y : ", y.shape)
+print("Jumlah kelas Malignant (1):", np.sum(y == 1))
+print("Jumlah kelas Benign (0):", np.sum(y == 0))
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Setelah hapus kolom sampah: (569, 32)
+Shape X :  (569, 30)
+Shape y :  (569,)
+Jumlah kelas Malignant (1): 212
+Jumlah kelas Benign (0): 357
+\end{verbatim}
+
+\textbf{Penjelasan:} 
+\begin{itemize}
+    \item \texttt{dropna(axis=1, how='all')}: Menghapus kolom yang semua nilainya NaN (kolom "Unnamed: 32")
+    \item Drop kolom 'id' dan 'diagnosis' untuk mendapatkan matriks fitur X
+    \item Mapping diagnosis: M=1, B=0
+    \item Hasil: 569 sampel dengan 30 fitur
+\end{itemize}
+
+\subsection{Split Data dan Standardisasi}
+
+\begin{lstlisting}[caption=Train-Test Split]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+print("Shape X_train : ", X_train.shape)
+print("Shape X_test : ", X_test.shape)
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Shape X_train :  (455, 30)
+Shape X_test :  (114, 30)
+\end{verbatim}
+
+\textbf{Penjelasan:} Data dibagi 80:20 dengan stratifikasi untuk menjaga proporsi kelas. Data training: 455 sampel, data testing: 114 sampel.
+
+\begin{lstlisting}[caption=Standardisasi Fitur]
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+\end{lstlisting}
+
+\textbf{Penjelasan:} StandardScaler mengubah fitur menjadi mean=0 dan std=1. Penting untuk PCA karena PCA sensitif terhadap skala fitur.
+
+\subsection{Model SVM Tanpa PCA (Baseline)}
+
+\begin{lstlisting}[caption=Training SVM pada Data Original]
+svm_no_pca = SVC(kernel='rbf', gamma='scale', random_state=42)
+svm_no_pca.fit(X_train_scaled, y_train)
+
+y_pred_no_pca = svm_no_pca.predict(X_test_scaled)
+accuracy_no_pca = accuracy_score(y_test, y_pred_no_pca)
+print("Accuracy tanpa PCA: ", accuracy_no_pca)
+print("\nClassification Report tanpa PCA:\n", 
+      classification_report(y_test, y_pred_no_pca))
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Accuracy tanpa PCA:  0.9736842105263158
+
+              precision    recall  f1-score   support
+
+           0       0.96      1.00      0.98        72
+           1       1.00      0.93      0.96        42
+
+    accuracy                           0.97       114
+   macro avg       0.98      0.96      0.97       114
+weighted avg       0.98      0.97      0.97       114
+\end{verbatim}
+
+\textbf{Penjelasan:} SVM dengan kernel RBF pada 30 fitur original mencapai akurasi \textbf{97.37\%}. Model baseline ini sangat baik dengan precision dan recall tinggi untuk kedua kelas.
+
+\subsection{Implementasi PCA}
+
+\begin{lstlisting}[caption=Reduksi Dimensi dengan PCA]
+pca = PCA(n_components=3)
+X_train_pca = pca.fit_transform(X_train_scaled)
+X_test_pca = pca.transform(X_test_scaled)
+
+print("Shape X_train_pca : ", X_train_pca.shape)
+print("Shape X_test_pca : ", X_test_pca.shape)
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Shape X_train_pca :  (455, 3)
+Shape X_test_pca :  (114, 3)
+\end{verbatim}
+
+\textbf{Penjelasan:} PCA mereduksi 30 fitur menjadi 3 komponen principal. Dimensi berkurang 90\% (dari 30 menjadi 3).
+
+\begin{lstlisting}[caption=Explained Variance Ratio]
+explained_variance = pca.explained_variance_ratio_
+print("Explained Variance Ratio oleh masing-masing komponen PCA:", 
+      explained_variance)
+print("Total Explained Variance oleh 3 komponen PCA:", 
+      np.sum(explained_variance))
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Explained Variance Ratio: [0.44272026 0.18971182 0.09393163]
+Total Explained Variance: 0.7263637
+\end{verbatim}
+
+\textbf{Penjelasan:} 
+\begin{itemize}
+    \item PC1 menjelaskan 44.27\% variansi total
+    \item PC2 menjelaskan 18.97\% variansi total
+    \item PC3 menjelaskan 9.39\% variansi total
+    \item Total 3 komponen menjelaskan 72.64\% variansi data original
+\end{itemize}
+
+\subsection{Visualisasi Explained Variance}
+
+\begin{lstlisting}[caption=Bar Chart Explained Variance]
+plt.bar([1, 2, 3], explained_variance)
+plt.xlabel('Principal Component')
+plt.ylabel('Explained Variance Ratio')
+plt.title('Explained Variance Ratio by Principal Components')
+plt.show()
+\end{lstlisting}
+
+\textbf{Output Visual:} Bar chart menampilkan 3 batang dengan tinggi menurun: PC1 (44\%), PC2 (19\%), PC3 (9\%). Visualisasi ini menunjukkan bahwa PC1 dominan dalam menjelaskan variansi data.
+
+\subsection{Model SVM dengan PCA}
+
+\begin{lstlisting}[caption=Training SVM pada Data PCA]
+svm_pca = SVC(kernel='rbf', gamma='scale', random_state=42)
+svm_pca.fit(X_train_pca, y_train)
+
+y_pred_pca = svm_pca.predict(X_test_pca)
+accuracy_pca = accuracy_score(y_test, y_pred_pca)
+print("Accuracy dengan PCA: ", accuracy_pca)
+print("\nClassification Report dengan PCA:\n", 
+      classification_report(y_test, y_pred_pca))
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Accuracy dengan PCA:  0.956140350877193
+
+              precision    recall  f1-score   support
+
+           0       0.94      1.00      0.97        72
+           1       1.00      0.88      0.94        42
+
+    accuracy                           0.96       114
+   macro avg       0.97      0.94      0.95       114
+weighted avg       0.96      0.96      0.96       114
+\end{verbatim}
+
+\textbf{Penjelasan:} SVM dengan 3 komponen PCA mencapai akurasi \textbf{95.61\%}. Meskipun sedikit menurun dari baseline (97.37\%), penurunan hanya 1.76\% dengan pengurangan dimensi 90\%.
+
+\subsection{Visualisasi 3D PCA}
+
+\begin{lstlisting}[caption=3D Scatter Plot Data PCA]
+fig = plt.figure(figsize=(10,8))
+ax = fig.add_subplot(111, projection='3d')
+
+scatter = ax.scatter(
+    X_train_pca[:, 0], X_train_pca[:, 1], X_train_pca[:, 2], 
+    c=y_train, cmap='coolwarm', s=60
+)
+
+ax.set_title('3D Scatter Plot of PCA-transformed Breast Cancer Data')
+ax.set_xlabel('Principal Component 1')
+ax.set_ylabel('Principal Component 2')
+ax.set_zlabel('Principal Component 3')
+
+legend1 = ax.legend(*scatter.legend_elements(), 
+                    labels=['Benign (0)', 'Malignant (1)'], 
+                    title="Diagnosis")
+ax.add_artist(legend1)
+plt.show()
+\end{lstlisting}
+
+\textbf{Output Visual:} Scatter plot 3D menampilkan data training dalam ruang 3 komponen principal. Warna biru (Benign) dan merah (Malignant) menunjukkan separasi kelas yang jelas. Kedua kelas dapat dibedakan dengan baik dalam ruang PCA 3D, menjelaskan mengapa SVM masih mencapai akurasi tinggi meskipun dimensi berkurang drastis.
+
+\subsection{Perbandingan Hasil}
+
+\begin{lstlisting}[caption=Tabel Perbandingan]
+comparison = pd.DataFrame({
+    'Model': ['SVM tanpa PCA', 'SVM dengan PCA'],
+    'Jumlah Fitur': [X_train.shape[1], X_train_pca.shape[1]],
+    'Akurasi': [accuracy_no_pca, accuracy_pca],
+    'Variansi Total PCA' : [None, np.sum(explained_variance)]
+})
+comparison
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{table}[H]
+\centering
+\caption{Perbandingan Model SVM dengan dan tanpa PCA}
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{Model} & \textbf{Jumlah Fitur} & \textbf{Akurasi} & \textbf{Variansi PCA} \\
+\hline
+SVM tanpa PCA & 30 & 0.9737 & - \\
+SVM dengan PCA & 3 & 0.9561 & 0.7264 \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{lstlisting}[caption=Visualisasi Perbandingan Akurasi]
+plt.figure(figsize=(8,6))
+plt.bar(['Tanpa PCA', 'Dengan PCA'], 
+        [accuracy_no_pca, accuracy_pca], 
+        color=['blue', 'orange'])
+plt.title('Perbandingan Akurasi SVM dengan dan tanpa PCA\nBreast Cancer Dataset')
+plt.ylabel('Akurasi')
+plt.ylim(0, 1)
+for i, v in enumerate([accuracy_no_pca, accuracy_pca]):
+    plt.text(i, v + 0.02, f"{v:.4f}", ha='center', fontweight='bold')
+plt.show()
+\end{lstlisting}
+
+\textbf{Output Visual:} Bar chart dengan 2 batang vertikal menunjukkan akurasi. Batang biru (Tanpa PCA) di 97.37\% sedikit lebih tinggi dari batang oranye (Dengan PCA) di 95.61\%. Label nilai ditampilkan di atas setiap batang.
+
+\subsection{Confusion Matrix}
+
+\begin{lstlisting}[caption=Confusion Matrix Kedua Model]
+cm_no_pca = confusion_matrix(y_test, y_pred_no_pca)
+print("Confusion Matrix (tanpa PCA):")
+print(cm_no_pca)
+
+cm_pca = confusion_matrix(y_test, y_pred_pca)
+print("\nConfusion Matrix (dengan PCA):")
+print(cm_pca)
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Confusion Matrix (tanpa PCA):
+[[72  0]
+ [ 3 39]]
+
+Confusion Matrix (dengan PCA):
+[[72  0]
+ [ 5 37]]
+\end{verbatim}
+
+\textbf{Penjelasan:}
+\begin{itemize}
+    \item \textbf{Tanpa PCA}: 72 TN, 0 FP, 3 FN, 39 TP. Sempurna untuk kelas Benign (tidak ada False Positive), 3 Malignant salah klasifikasi sebagai Benign.
+    \item \textbf{Dengan PCA}: 72 TN, 0 FP, 5 FN, 37 TP. Tetap sempurna untuk kelas Benign, tapi 5 Malignant salah klasifikasi (naik 2 dari tanpa PCA).
+    \item Perbedaan kecil ini konsisten dengan penurunan akurasi 1.76\%
+\end{itemize}
+
+\section{Kesimpulan}
+
+\begin{enumerate}
+    \item PCA berhasil mereduksi dimensi dari 30 fitur menjadi 3 komponen principal (reduksi 90\%) dengan tetap mempertahankan 72.64\% variansi data original.
+    
+    \item Model SVM tanpa PCA mencapai akurasi 97.37\%, sementara SVM dengan PCA mencapai 95.61\%. Penurunan akurasi hanya 1.76\%.
+    
+    \item Trade-off antara efisiensi komputasi dan akurasi sangat menguntungkan: pengurangan 90\% dimensi dengan penurunan akurasi kurang dari 2\%.
+    
+    \item Visualisasi 3D menunjukkan separasi kelas yang jelas dalam ruang PCA, menjelaskan mengapa model dengan hanya 3 fitur masih berkinerja sangat baik.
+    
+    \item PCA sangat efektif untuk dataset Breast Cancer dan dapat direkomendasikan untuk aplikasi yang memerlukan efisiensi komputasi tanpa mengorbankan performa secara signifikan.
+\end{enumerate}
+
+\end{document}
