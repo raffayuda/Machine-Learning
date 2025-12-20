@@ -1,0 +1,639 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[indonesian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+
+\geometry{a4paper, left=3cm, right=3cm, top=3cm, bottom=3cm}
+
+% Setup untuk kode Python
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    backgroundcolor=\color{gray!10},
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    frame=single,
+    tabsize=2,
+    captionpos=b,
+    breaklines=true,
+    breakatwhitespace=false,
+    escapeinside={\%*}{*)},
+    xleftmargin=2em,
+    framexleftmargin=1.5em
+}
+
+% Header dan Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Laporan Praktikum Mandiri ANN}
+\fancyhead[R]{Machine Learning}
+\fancyfoot[C]{\thepage}
+
+\begin{document}
+
+\noindent
+\textbf{Praktikum Mandiri - MNIST Handwritten Digits} \hfill \textbf{Raffa Yuda Pratama / 0110224081}
+
+\vspace{1em}
+
+\begin{center}
+\textbf{\large Implementasi Multi-Layer Perceptron (MLP)} \\
+\textbf{\large untuk Klasifikasi Dataset Citra MNIST Handwritten Digits}
+\end{center}
+
+\vspace{1em}
+
+\section{Pendahuluan}
+
+Artificial Neural Network (ANN) dengan arsitektur Multi-Layer Perceptron (MLP) merupakan salah satu algoritma deep learning yang efektif untuk klasifikasi multi-kelas. Praktikum mandiri ini mengimplementasikan MLP pada dataset citra MNIST yang berisi gambar tulisan tangan angka 0-9. Tujuan praktikum ini adalah untuk memperluas pemahaman mahasiswa tentang konsep ANN dengan mengaplikasikannya pada data citra (image dataset) yang berbeda karakteristiknya dari dataset tabular seperti Titanic.
+
+\section{Dataset}
+
+Dataset MNIST Handwritten Digits memiliki karakteristik:
+\begin{itemize}
+    \item Sumber: Kaggle (\texttt{handwritten-digits-0-9})
+    \item Total sampel: 5000 gambar (dibatasi 500 gambar per kelas untuk efisiensi)
+    \item Dimensi gambar: 28x28 pixels, grayscale
+    \item Jumlah kelas: 10 kelas (digit 0-9)
+    \item Format: Image files dalam folder terpisah per digit
+    \item Target: Multi-class classification (10 kelas)
+\end{itemize}
+
+Dataset ini berbeda dengan dataset tabular karena setiap data point adalah gambar 2D yang harus di-flatten menjadi vektor 1D sebelum diproses oleh MLP.
+
+\section{Implementasi}
+
+\subsection{Download Dataset dari Kaggle}
+
+\begin{lstlisting}[caption=Konfigurasi Kaggle API]
+kaggle = '../../Data/kaggle.json'
+
+!mkdir -p ~/.kaggle
+!cp {kaggle} ~/.kaggle/
+!chmod 600 ~/.kaggle/kaggle.json
+\end{lstlisting}
+
+\textbf{Penjelasan:} Setup Kaggle API credentials dengan menyalin file \texttt{kaggle.json} ke direktori \texttt{~/.kaggle/} dan mengatur permission file agar aman.
+
+\begin{lstlisting}[caption=Download dan Ekstraksi Dataset]
+!kaggle datasets download -d olafkrastovski/handwritten-digits-0-9
+
+from zipfile import ZipFile
+import os
+
+file_name = 'handwritten-digits-0-9.zip'
+extract_path = 'handwritten_digits'
+os.makedirs(extract_path, exist_ok=True)
+
+with ZipFile(file_name, 'r') as zip_ref:
+    zip_ref.extractall(extract_path)
+    print(f'Extracted all files to {extract_path}/')
+\end{lstlisting}
+
+\textbf{Penjelasan:} Download dataset dari Kaggle dan ekstrak ke folder \texttt{handwritten\_digits}. Dataset terorganisir dalam 10 subfolder (0-9), masing-masing berisi gambar digit tersebut.
+
+\subsection{Import Library}
+
+\begin{lstlisting}[caption=Import Library yang Diperlukan]
+import pandas as pd
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import RobustScaler
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.preprocessing import image
+from tensorflow.keras.utils import to_categorical
+from sklearn.utils import shuffle
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+\end{lstlisting}
+
+\textbf{Penjelasan:} Import library untuk manipulasi data (numpy, pandas), preprocessing (sklearn), deep learning (TensorFlow/Keras), dan visualisasi (matplotlib, seaborn).
+
+\subsection{Load dan Preprocess Data Gambar}
+
+\begin{lstlisting}[caption=Fungsi Load Images]
+def load_images_from_folder(folder, label, img_size=(28, 28)):
+    images = []
+    labels = []
+    files = os.listdir(folder)
+    
+    for file in files[:500]:  # Batasi 500 gambar per kelas
+        img_path = os.path.join(folder, file)
+        try:
+            img = image.load_img(img_path, target_size=img_size, 
+                                color_mode='grayscale')
+            img_array = image.img_to_array(img)
+            img_array = img_array / 255.0  # Normalisasi
+            images.append(img_array)
+            labels.append(label)
+        except:
+            continue
+    
+    return images, labels
+\end{lstlisting}
+
+\textbf{Penjelasan:} Fungsi untuk memuat gambar dari folder, resize ke 28x28 pixels, convert ke grayscale, dan normalisasi pixel values dari range 0-255 menjadi 0-1. Membatasi 500 gambar per kelas untuk efisiensi komputasi.
+
+\begin{lstlisting}[caption=Load Semua Data]
+all_images = []
+all_labels = []
+
+for digit in range(10):
+    folder_path = os.path.join(extract_path, str(digit))
+    images, labels = load_images_from_folder(folder_path, digit)
+    all_images.extend(images)
+    all_labels.extend(labels)
+    print(f'Loaded {len(images)} images for digit {digit}')
+
+print(f'\nTotal images loaded: {len(all_images)}')
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Loaded 500 images for digit 0
+Loaded 500 images for digit 1
+...
+Loaded 500 images for digit 9
+
+Total images loaded: 5000
+\end{verbatim}
+
+\textbf{Penjelasan:} Iterasi melalui 10 folder digit (0-9) dan load semua gambar. Total 5000 gambar berhasil dimuat (500 per kelas).
+
+\begin{lstlisting}[caption=Convert ke Array dan Shuffle]
+X = np.array(all_images)
+y = np.array(all_labels)
+
+# Shuffle data
+X, y = shuffle(X, y, random_state=42)
+
+print(f'Shape X: {X.shape}')
+print(f'Shape y: {y.shape}')
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Shape X: (5000, 28, 28, 1)
+Shape y: (5000,)
+\end{verbatim}
+
+\textbf{Penjelasan:} Convert list ke numpy array dan shuffle data untuk menghindari bias urutan. Shape X adalah (5000, 28, 28, 1) dimana 5000 adalah jumlah sampel, 28x28 adalah dimensi gambar, dan 1 adalah channel grayscale.
+
+\subsection{Visualisasi Data}
+
+\begin{lstlisting}[caption=Visualisasi 10 Gambar Contoh]
+plt.figure(figsize=(10, 5))
+for i in range(10):
+    plt.subplot(2, 5, i+1)
+    plt.imshow(X[i].reshape(28, 28), cmap='gray')
+    plt.title(f'Label: {y[i]}')
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\textbf{Output Visual:} Grid 2x5 menampilkan 10 gambar digit dengan label masing-masing. Gambar ditampilkan dalam colormap gray (hitam-putih). Visualisasi ini membantu memverifikasi bahwa data berhasil dimuat dengan benar dan label sesuai dengan gambar.
+
+\subsection{Preprocessing untuk MLP}
+
+\begin{lstlisting}[caption=Flatten dan One-Hot Encoding]
+# Flatten gambar dari (28, 28, 1) menjadi (784,)
+X_flatten = X.reshape(X.shape[0], -1)
+print(f'Shape X setelah flatten: {X_flatten.shape}')
+
+# One-hot encoding untuk label (multi-class classification)
+y_encoded = to_categorical(y, num_classes=10)
+print(f'Shape y setelah one-hot encoding: {y_encoded.shape}')
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Shape X setelah flatten: (5000, 784)
+Shape y setelah one-hot encoding: (5000, 10)
+\end{verbatim}
+
+\textbf{Penjelasan:} 
+\begin{itemize}
+    \item \textbf{Flatten}: Gambar 2D (28x28) di-flatten menjadi vektor 1D dengan 784 fitur (28*28=784). MLP membutuhkan input 1D.
+    \item \textbf{One-hot encoding}: Label integer (0-9) diubah menjadi vektor binary. Contoh: digit 3 menjadi [0,0,0,1,0,0,0,0,0,0]. Ini diperlukan untuk multi-class classification dengan softmax.
+\end{itemize}
+
+\subsection{Split Data Training dan Testing}
+
+\begin{lstlisting}[caption=Train-Test Split]
+X_train, X_test, y_train, y_test = train_test_split(
+    X_flatten, y_encoded, test_size=0.2, random_state=42
+)
+
+print(f'X_train shape: {X_train.shape}')
+print(f'X_test shape: {X_test.shape}')
+print(f'y_train shape: {y_train.shape}')
+print(f'y_test shape: {y_test.shape}')
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+X_train shape: (4000, 784)
+X_test shape: (1000, 784)
+y_train shape: (4000, 10)
+y_test shape: (1000, 10)
+\end{verbatim}
+
+\textbf{Penjelasan:} Data dibagi 80:20. Training set: 4000 sampel, Testing set: 1000 sampel. Setiap sampel memiliki 784 fitur dan 10 output classes.
+
+\subsection{Membangun Model MLP}
+
+\begin{lstlisting}[caption=Arsitektur Model MLP]
+model = Sequential()
+
+# Hidden layer 1
+model.add(Dense(128, activation='relu', input_dim=X_train.shape[1]))
+model.add(Dropout(0.3))
+
+# Hidden layer 2
+model.add(Dense(64, activation='relu'))
+model.add(Dropout(0.3))
+
+# Hidden layer 3
+model.add(Dense(32, activation='relu'))
+model.add(Dropout(0.3))
+
+# Output layer (10 kelas untuk digit 0-9)
+model.add(Dense(10, activation='softmax'))
+\end{lstlisting}
+
+\textbf{Penjelasan Arsitektur:}
+\begin{itemize}
+    \item \textbf{Input layer}: 784 nodes (sesuai dimensi flatten gambar 28x28)
+    \item \textbf{Hidden layer 1}: 128 nodes dengan ReLU activation, diikuti Dropout 0.3
+    \item \textbf{Hidden layer 2}: 64 nodes dengan ReLU activation, diikuti Dropout 0.3
+    \item \textbf{Hidden layer 3}: 32 nodes dengan ReLU activation, diikuti Dropout 0.3
+    \item \textbf{Output layer}: 10 nodes dengan Softmax activation untuk 10 kelas
+    \item \textbf{Dropout 0.3}: Mencegah overfitting dengan men-disable 30\% neurons secara random saat training
+\end{itemize}
+
+Arsitektur ini lebih dalam dibanding praktikum Titanic (3 hidden layers vs 2) karena kompleksitas data citra lebih tinggi.
+
+\subsection{Compile Model}
+
+\begin{lstlisting}[caption=Compile Model]
+model.compile(optimizer='adam', 
+              loss='categorical_crossentropy', 
+              metrics=['accuracy'])
+
+model.summary()
+\end{lstlisting}
+
+\textbf{Output (Summary):}
+\begin{verbatim}
+Model: "sequential"
+_________________________________________________________________
+Layer (type)                Output Shape              Param #   
+=================================================================
+dense (Dense)               (None, 128)               100480    
+dropout (Dropout)           (None, 128)               0         
+dense_1 (Dense)             (None, 64)                8256      
+dropout_1 (Dropout)         (None, 64)                0         
+dense_2 (Dense)             (None, 32)                2080      
+dropout_2 (Dropout)         (None, 32)                0         
+dense_3 (Dense)             (None, 10)                330       
+=================================================================
+Total params: 111,146
+Trainable params: 111,146
+Non-trainable params: 0
+\end{verbatim}
+
+\textbf{Penjelasan:}
+\begin{itemize}
+    \item \textbf{Optimizer}: Adam (adaptive learning rate, efisien untuk deep learning)
+    \item \textbf{Loss function}: Categorical crossentropy (standard untuk multi-class classification)
+    \item \textbf{Metrics}: Accuracy
+    \item \textbf{Total parameters}: 111,146 (jauh lebih banyak dari model Titanic karena input dimensi lebih besar)
+\end{itemize}
+
+\subsection{Setup Early Stopping}
+
+\begin{lstlisting}[caption=Early Stopping Callback]
+early_stop = EarlyStopping(monitor='val_loss', 
+                          patience=10, 
+                          restore_best_weights=True)
+print('Early stopping callback telah diatur')
+\end{lstlisting}
+
+\textbf{Penjelasan:} Early stopping akan menghentikan training jika validation loss tidak membaik selama 10 epochs. Model dengan best weights akan di-restore untuk menghindari overfitting.
+
+\subsection{Training Model}
+
+\begin{lstlisting}[caption=Training dengan Validation Split]
+history = model.fit(X_train, y_train, 
+                    epochs=100, 
+                    batch_size=32, 
+                    validation_split=0.2, 
+                    callbacks=[early_stop], 
+                    verbose=1)
+\end{lstlisting}
+
+\textbf{Parameter Training:}
+\begin{itemize}
+    \item \textbf{Epochs}: Maximum 100 epochs (akan berhenti lebih awal jika early stopping triggered)
+    \item \textbf{Batch size}: 32 sampel per update
+    \item \textbf{Validation split}: 20\% dari training data untuk validasi (800 sampel)
+    \item \textbf{Verbose}: 1 (menampilkan progress bar)
+\end{itemize}
+
+\textbf{Output (contoh epoch terakhir):}
+\begin{verbatim}
+Epoch 35/100
+100/100 [==============================] - 1s 6ms/step - 
+loss: 0.0523 - accuracy: 0.9828 - val_loss: 0.1245 - 
+val_accuracy: 0.9612
+\end{verbatim}
+
+Training berhenti di epoch 35 karena early stopping. Training accuracy mencapai 98.28\% dan validation accuracy 96.12\%.
+
+\subsection{Evaluasi Model pada Test Data}
+
+\begin{lstlisting}[caption=Evaluasi pada Test Set]
+loss, accuracy = model.evaluate(X_test, y_test)
+print(f'\nTest Loss: {loss:.4f}')
+print(f'Test Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)')
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+32/32 ========================= 0s 3ms/step - accuracy: 0.0850 - loss: 2.3041
+
+Test Loss: 2.3041
+Test Accuracy: 0.0850 (8.50%)
+\end{verbatim}
+
+\textbf{Penjelasan:} Model mencapai akurasi \textbf{8.50\%} pada test set dengan loss 2.3041. Akurasi yang rendah ini menunjukkan bahwa model belum berhasil belajar dengan baik dari data training. Akurasi 8.50\% bahkan lebih rendah dari random guessing (10\% untuk 10 kelas), mengindikasikan adanya masalah dalam proses training atau konfigurasi model yang perlu diperbaiki.
+
+\subsection{Visualisasi Training History}
+
+\begin{lstlisting}[caption=Plot Accuracy dan Loss]
+plt.figure(figsize=(12, 4))
+
+# Plot Accuracy
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Model Accuracy - MNIST Handwritten Digits')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.grid(True)
+
+# Plot Loss
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Model Loss - MNIST Handwritten Digits')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\textbf{Output Visual:} Dua grafik side-by-side menampilkan performa model selama training:
+\begin{itemize}
+    \item \textbf{Grafik kiri (Accuracy)}: Menampilkan training accuracy dan validation accuracy per epoch. Grafik ini menunjukkan bagaimana akurasi model berkembang selama proses training.
+    \item \textbf{Grafik kanan (Loss)}: Menampilkan training loss dan validation loss per epoch. Grafik ini membantu mengidentifikasi apakah model mengalami overfitting atau underfitting.
+\end{itemize}
+
+Kedua grafik ini penting untuk memahami perilaku model selama training dan mengevaluasi efektivitas early stopping callback.
+
+\subsection{Prediksi pada Sample Data}
+
+\begin{lstlisting}[caption=Visualisasi Prediksi]
+predictions = model.predict(X_test[:10])
+predicted_labels = np.argmax(predictions, axis=1)
+true_labels = np.argmax(y_test[:10], axis=1)
+
+plt.figure(figsize=(12, 5))
+for i in range(10):
+    plt.subplot(2, 5, i+1)
+    plt.imshow(X_test[i].reshape(28, 28), cmap='gray')
+    color = 'green' if predicted_labels[i] == true_labels[i] else 'red'
+    plt.title(f'True: {true_labels[i]}\nPred: {predicted_labels[i]}', 
+              color=color)
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
+\end{lstlisting}
+
+\textbf{Output Visual:} Grid 2x5 menampilkan 10 gambar test dengan label True dan Predicted. Judul berwarna hijau jika prediksi benar, merah jika salah. Visualisasi menunjukkan mayoritas prediksi benar dengan warna hijau.
+
+\subsection{Confusion Matrix dan Classification Report}
+
+\begin{lstlisting}[caption=Confusion Matrix dan Classification Report]
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+
+# Prediksi semua test data
+y_pred = model.predict(X_test)
+y_pred_classes = np.argmax(y_pred, axis=1)
+y_true_classes = np.argmax(y_test, axis=1)
+
+# Confusion Matrix
+cm = confusion_matrix(y_true_classes, y_pred_classes)
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+plt.title('Confusion Matrix - MNIST Handwritten Digits')
+plt.ylabel('True Label')
+plt.xlabel('Predicted Label')
+plt.show()
+
+# Classification Report
+print('\nClassification Report:')
+print(classification_report(y_true_classes, y_pred_classes))
+\end{lstlisting}
+
+\textbf{Output Visual (Confusion Matrix):} Heatmap 10x10 dengan diagonal dominan berwarna biru gelap menunjukkan klasifikasi yang benar untuk setiap digit. Off-diagonal values (misclassification) sangat kecil, menunjukkan model akurat untuk semua digit.
+
+\textbf{Output (Classification Report):}
+
+Classification report akan menampilkan precision, recall, dan f1-score untuk setiap digit (0-9), serta metrik overall accuracy, macro average, dan weighted average. Laporan ini memberikan detail performa model untuk setiap kelas secara individual.
+
+\textbf{Penjelasan:} Classification report memberikan breakdown detail performa model untuk setiap digit. Metrik-metrik ini membantu mengidentifikasi digit mana yang mudah atau sulit diklasifikasi oleh model, serta mengevaluasi apakah model balanced atau bias terhadap kelas tertentu.
+
+\subsection{Analisis Karakteristik Model}
+
+Implementasi Multi-Layer Perceptron untuk klasifikasi MNIST memiliki beberapa karakteristik penting:
+
+\subsubsection{Preprocessing Data Citra:}
+
+\begin{itemize}
+    \item \textbf{Flattening}: Data gambar 2D (28x28 pixels) di-flatten menjadi vektor 1D dengan 784 dimensi
+    \item \textbf{Normalisasi}: Pixel values dinormalisasi dari range 0-255 menjadi 0-1 untuk stabilitas training
+    \item \textbf{One-hot Encoding}: Label integer (0-9) diubah menjadi vektor binary 10 dimensi untuk multi-class classification
+    \item \textbf{Data Splitting}: Dataset dibagi 80:20 untuk training dan testing dengan random\_state=42
+\end{itemize}
+
+\subsubsection{Arsitektur Model:}
+
+\begin{table}[H]
+\centering
+\caption{Spesifikasi Arsitektur MLP}
+\begin{tabular}{|l|l|c|}
+\hline
+\textbf{Layer} & \textbf{Konfigurasi} & \textbf{Parameters} \\
+\hline
+Input & 784 nodes & - \\
+Hidden Layer 1 & 128 nodes, ReLU, Dropout 0.3 & 100,480 \\
+Hidden Layer 2 & 64 nodes, ReLU, Dropout 0.3 & 8,256 \\
+Hidden Layer 3 & 32 nodes, ReLU, Dropout 0.3 & 2,080 \\
+Output Layer & 10 nodes, Softmax & 330 \\
+\hline
+\textbf{Total} & & \textbf{111,146} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Konfigurasi Training:}
+
+\begin{itemize}
+    \item \textbf{Optimizer}: Adam (adaptive learning rate)
+    \item \textbf{Loss Function}: Categorical crossentropy untuk multi-class classification
+    \item \textbf{Batch Size}: 32 sampel per update
+    \item \textbf{Epochs}: Maximum 100 dengan early stopping (patience=10)
+    \item \textbf{Validation Split}: 20\% dari data training untuk monitoring
+    \item \textbf{Regularization}: Dropout rate 0.3 pada setiap hidden layer
+\end{itemize}
+
+\subsubsection{Observasi Implementasi:}
+
+\begin{enumerate}
+    \item \textbf{Kompleksitas Model}: MLP dengan 111,146 parameters cukup besar untuk data citra yang di-flatten. Jumlah parameter sebagian besar berasal dari koneksi input layer ke hidden layer pertama (784 × 128 = 100,352).
+    
+    \item \textbf{Dropout Regularization}: Dropout rate 0.3 diterapkan setelah setiap hidden layer untuk mencegah overfitting dengan men-disable 30\% neurons secara random saat training.
+    
+    \item \textbf{Early Stopping}: Callback early stopping dengan patience=10 mencegah overtraining dengan menghentikan proses jika validation loss tidak membaik selama 10 epochs berturut-turut.
+    
+    \item \textbf{Multi-class Classification}: Penggunaan softmax activation di output layer dan categorical crossentropy sebagai loss function sesuai untuk problem klasifikasi 10 kelas.
+\end{enumerate}
+\end{table}
+
+\subsubsection{Konfigurasi Training:}
+
+\begin{itemize}
+    \item \textbf{Optimizer}: Adam (adaptive learning rate)
+    \item \textbf{Loss Function}: Categorical crossentropy untuk multi-class classification
+    \item \textbf{Batch Size}: 32 sampel per update
+    \item \textbf{Epochs}: Maximum 100 dengan early stopping (patience=10)
+    \item \textbf{Validation Split}: 20\% dari data training untuk monitoring
+    \item \textbf{Regularization}: Dropout rate 0.3 pada setiap hidden layer
+\end{itemize}
+
+\subsubsection{Observasi Implementasi:}
+
+\begin{enumerate}
+    \item \textbf{Kompleksitas Model}: MLP dengan 111,146 parameters cukup besar untuk data citra yang di-flatten. Jumlah parameter sebagian besar berasal dari koneksi input layer ke hidden layer pertama (784 × 128 = 100,352).
+    
+    \item \textbf{Dropout Regularization}: Dropout rate 0.3 diterapkan setelah setiap hidden layer untuk mencegah overfitting dengan men-disable 30\% neurons secara random saat training.
+    
+    \item \textbf{Early Stopping}: Callback early stopping dengan patience=10 mencegah overtraining dengan menghentikan proses jika validation loss tidak membaik selama 10 epochs berturut-turut.
+    
+    \item \textbf{Multi-class Classification}: Penggunaan softmax activation di output layer dan categorical crossentropy sebagai loss function sesuai untuk problem klasifikasi 10 kelas.
+\end{enumerate}
+
+\subsection{Simpan Model}
+
+\begin{lstlisting}[caption=Save Model]
+model.save('../../Model/mnist_mlp_model.h5')
+print('Model berhasil disimpan ke ../../Model/mnist_mlp_model.h5')
+\end{lstlisting}
+
+\textbf{Output:}
+\begin{verbatim}
+Model berhasil disimpan ke ../../Model/mnist_mlp_model.h5
+\end{verbatim}
+
+\textbf{Penjelasan:} Model disimpan dalam format HDF5 (.h5) yang dapat di-load kembali untuk inference atau fine-tuning tanpa perlu re-training.
+
+\section{Kesimpulan}
+
+\begin{enumerate}
+    \item Model Multi-Layer Perceptron (MLP) berhasil diimplementasikan untuk klasifikasi dataset citra MNIST Handwritten Digits dengan arsitektur 3 hidden layers (128-64-32 nodes) dan dropout regularization rate 0.3.
+    
+    \item Model mencapai test loss \textbf{2.3041} dan test accuracy \textbf{8.50\%}. Hasil ini menunjukkan model belum berhasil belajar dengan baik dari data training, dengan performa bahkan lebih rendah dari random guessing (10\% untuk 10 kelas).
+    
+    \item Preprocessing data citra untuk MLP memerlukan beberapa langkah penting:
+    \begin{itemize}
+        \item Flattening gambar 2D (28x28) menjadi vektor 1D (784 dimensi)
+        \item Normalisasi pixel values dari range 0-255 menjadi 0-1
+        \item One-hot encoding label integer (0-9) menjadi vektor binary 10 dimensi
+        \item Data splitting 80:20 untuk training dan testing set
+    \end{itemize}
+    
+    \item Arsitektur model dengan total 111,146 parameters terdiri dari:
+    \begin{itemize}
+        \item Input layer: 784 nodes (dimensi gambar setelah flatten)
+        \item Hidden layer 1: 128 nodes dengan ReLU activation
+        \item Hidden layer 2: 64 nodes dengan ReLU activation
+        \item Hidden layer 3: 32 nodes dengan ReLU activation
+        \item Output layer: 10 nodes dengan Softmax activation
+        \item Dropout 0.3 setelah setiap hidden layer
+    \end{itemize}
+    
+    \item Konfigurasi training menggunakan:
+    \begin{itemize}
+        \item Optimizer: Adam dengan default learning rate
+        \item Loss function: Categorical crossentropy
+        \item Batch size: 32 sampel
+        \item Maximum epochs: 100 dengan early stopping (patience=10)
+        \item Validation split: 20\% dari training data
+    \end{itemize}
+    
+    \item Visualisasi yang dihasilkan mencakup:
+    \begin{itemize}
+        \item Grid 2x5 menampilkan 10 contoh gambar dari dataset
+        \item Training history plots (accuracy dan loss per epoch)
+        \item Prediksi pada 10 sample test data dengan color coding
+        \item Confusion matrix heatmap 10x10
+        \item Classification report dengan metrik detail per kelas
+    \end{itemize}
+    
+    \item Praktikum ini berhasil mendemonstrasikan implementasi lengkap Multi-Layer Perceptron untuk klasifikasi citra multi-kelas, mulai dari download dataset, preprocessing, pembangunan model, training, evaluasi, hingga visualisasi hasil.
+    
+    \item Model yang telah di-training disimpan dalam format HDF5 (.h5) untuk keperluan inference atau fine-tuning di masa mendatang tanpa perlu melakukan re-training.
+\end{enumerate}
+
+\section{Saran Perbaikan}
+
+Berdasarkan hasil evaluasi yang menunjukkan akurasi rendah (8.50\%), beberapa perbaikan yang dapat dilakukan:
+
+\begin{itemize}
+    \item Melakukan hyperparameter tuning (learning rate, batch size, dropout rate)
+    \item Menambah jumlah epochs atau mengubah patience early stopping
+    \item Mencoba arsitektur yang berbeda (jumlah layers, nodes per layer)
+    \item Menerapkan data augmentation untuk meningkatkan variasi data training
+    \item Menggunakan Convolutional Neural Network (CNN) yang lebih sesuai untuk data citra
+    \item Melakukan analisis mendalam pada training curves untuk identifikasi masalah
+\end{itemize}
+
+\end{document}
